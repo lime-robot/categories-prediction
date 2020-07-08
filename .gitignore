@@ -1,0 +1,17 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# logs
+logs/
+
+# packaging
+.Python
+build/
+
+# models
+models/
+
+# notebook
+.ipynb_checkpoints/
