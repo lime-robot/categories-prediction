@@ -3,6 +3,7 @@ os.environ['OMP_NUM_THREADS'] = '24'
 os.environ['NUMEXPR_MAX_THREADS'] = '24'
 import math
 import glob
+import json
 import torch
 import cate_loader
 import cate_model
@@ -20,10 +21,11 @@ import argparse
 import logging
 
 
-VERSION='v17'
-DB_PATH=f'../../input/processed_{VERSION}'
-MODEL_PATH=f'../../models/{VERSION}'
-VOCAB_DIR=os.path.join(DB_PATH, 'vocab')
+SETTINGS = json.load(open('SETTINGS.json')) # 세팅 정보를 읽어 온다.
+RAW_DATA_DIR = SETTINGS['RAW_DATA_DIR'] # 카카오에서 다운로드 받은 데이터의 디렉터리
+PROCESSED_DATA_DIR = SETTINGS['PROCESSED_DATA_DIR'] # 전처리된 데이터가 저장될 디렉터리
+VOCAB_DIR = SETTINGS['VOCAB_DIR'] # 전처리에 사용될 사전 파일이 저장될 디렉터리
+SUBMISSION_DIR = SETTINGS['SUBMISSION_DIR'] # 전처리에 사용될 사전 파일이 저장될 디렉터리
 
 
 class CFG:
@@ -51,13 +53,12 @@ class CFG:
     vocab_size = 32000
     img_feat_size = 2048
     type_vocab_size = 30
-    df_path = os.path.join(DB_PATH, 'train.csv')
-    h5_path = os.path.join(DB_PATH, 'train_img_feat.h5')    
 
 
 def main():    
     parser = argparse.ArgumentParser("")
     parser.add_argument("--model_dir", type=str, required=True)
+    parser.add_argument("--prefix", type=str, default='dev')
     parser.add_argument("--batch_size", type=int, default=CFG.batch_size)   
     parser.add_argument("--seq_len", type=int, default=CFG.seq_len)
     parser.add_argument("--seed", type=int, default=7)
@@ -88,9 +89,9 @@ def main():
     torch.backends.cudnn.deterministic = True
     
     print('loading ...')
-    valid_df = pd.read_csv(os.path.join(DB_PATH, 'dev.csv'), dtype={'tokens':str})     
+    valid_df = pd.read_csv(os.path.join(PROCESSED_DATA_DIR, f'{args.prefix}.csv'), dtype={'tokens':str})     
     valid_df['img_idx'] = valid_df.index
-    img_h5_path = os.path.join(DB_PATH, 'dev_img_feat.h5')
+    img_h5_path = os.path.join(PROCESSED_DATA_DIR, f'{args.prefix}_img_feat.h5')
     
     vocab = [line.split('\t')[0] for line in open(os.path.join(VOCAB_DIR, 'spm.vocab')).readlines()]
     token2id = dict([(w, i) for i, w in enumerate(vocab)])    
@@ -130,8 +131,10 @@ def main():
     pred_idx = validate(valid_loader, model_list)
     
     cate_cols = ['bcateid', 'mcateid', 'scateid', 'dcateid'] 
-    valid_df[cate_cols] = pred_idx    
-    valid_df[['pid'] + cate_cols].to_csv(f'dev.tsv', sep='\t', header=False, index=False)
+    valid_df[cate_cols] = pred_idx
+    os.makedirs(SUBMISSION_DIR, exist_ok=True)
+    submission_path = os.path.join(SUBMISSION_DIR, f'{args.prefix}.tsv')
+    valid_df[['pid'] + cate_cols].to_csv(submission_path, sep='\t', header=False, index=False)
             
     print('done')
 
@@ -146,7 +149,7 @@ def get_pred_idx(pred):
     return pred_idx
 
 
-def blend_pred_list(pred_list, t=0.3):
+def blend_pred_list(pred_list, t=0.5):
     b_pred, m_pred, s_pred, d_pred = 0, 0, 0, 0
     for pred in pred_list:
         b_pred += torch.softmax(pred[0], 1) ** t

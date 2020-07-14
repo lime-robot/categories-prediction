@@ -19,9 +19,8 @@ import warnings
 warnings.filterwarnings(action='ignore')
 
 
-VERSION='v17'
-DB_PATH=f'../../input/processed_{VERSION}'
-MODEL_PATH=f'../../models/{VERSION}'
+DB_PATH=f'../../input/processed'
+MODEL_PATH=f'../../models'
 VOCAB_DIR=os.path.join(DB_PATH, 'vocab')
 
 
@@ -66,7 +65,7 @@ def main():
     parser.add_argument("--nlayers", type=int, default=CFG.nlayers)
     parser.add_argument("--nheads", type=int, default=CFG.nheads)
     parser.add_argument("--hidden_size", type=int, default=CFG.hidden_size)    
-    parser.add_argument("--k", type=int, default=0)
+    parser.add_argument("--fold", type=int, default=0)
     parser.add_argument("--lr", type=float, default=CFG.learning_rate)
     parser.add_argument("--dropout", type=float, default=CFG.dropout)    
     args = parser.parse_args()
@@ -81,8 +80,7 @@ def main():
     CFG.seed =  args.seed        
     CFG.nlayers =  args.nlayers    
     CFG.nheads =  args.nheads
-    CFG.hidden_size =  args.hidden_size
-    CFG.res_dir=f'res_dir_{args.k}'
+    CFG.hidden_size =  args.hidden_size    
     print(CFG.__dict__)    
     
     os.environ['PYTHONHASHSEED'] = str(CFG.seed)
@@ -99,7 +97,7 @@ def main():
         train_df['unique_cateid'] = (train_df['bcateid'].astype('str') + train_df['mcateid'].astype('str') + 
                                                 train_df['scateid'].astype('str') + train_df['dcateid'].astype('str'))
         folds = StratifiedKFold(n_splits=5, random_state=7, shuffle=True)
-        train_idx, valid_idx = list(folds.split(train_df.values, train_df['unique_cateid']))[args.k]
+        train_idx, valid_idx = list(folds.split(train_df.values, train_df['unique_cateid']))[args.fold]
         valid_df = train_df.iloc[valid_idx]
         train_df = train_df.iloc[train_idx]
     else:
@@ -203,7 +201,7 @@ def main():
             
             curr_model_name = (f'b{CFG.batch_size}_h{CFG.hidden_size}_'
                                f'd{CFG.dropout}_l{CFG.nlayers}_hd{CFG.nheads}_'
-                               f'ep{epoch}_s{CFG.seed}_k{args.k}.pt')
+                               f'ep{epoch}_s{CFG.seed}_fold{args.fold}.pt')
             model_to_save = model.module if hasattr(model, 'module') else model  # Only save the cust_model it-self
                         
             save_checkpoint({
