@@ -19,8 +19,8 @@ import warnings
 warnings.filterwarnings(action='ignore')
 
 
-DB_PATH=f'../../input/processed'
-MODEL_PATH=f'../../models'
+DB_PATH=f'../input/processed'
+MODEL_PATH=f'../models'
 VOCAB_DIR=os.path.join(DB_PATH, 'vocab')
 
 
@@ -108,7 +108,7 @@ def main():
     token2id = dict([(w, i) for i, w in enumerate(vocab)])
     print('loading ... done')
         
-    model = cate_model.CateClassifierl(CFG)
+    model = cate_model.CateClassifier(CFG)
     if args.model != "":
         print("=> loading checkpoint '{}'".format(args.model))
         checkpoint = torch.load(args.model)        

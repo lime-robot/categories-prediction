@@ -1,18 +1,15 @@
-import copy
 import torch
 import torch.nn as nn
-import numpy as np
-import torch.nn.functional as F
-from transformers.modeling_bert import BertConfig, BertEncoder, BertModel
+from transformers.modeling_bert import BertConfig, BertModel
 
 
-class CateClassifierl(nn.Module):
+class CateClassifier(nn.Module):
     def __init__(self, cfg):
-        super(CateClassifierl, self).__init__()
+        super(CateClassifier, self).__init__()
         self.cfg = cfg
                 
         self.bert_cfg = BertConfig( 
-            cfg.vocab_size, # not used
+            cfg.vocab_size, 
             hidden_size=cfg.hidden_size,
             num_hidden_layers=cfg.nlayers,
             num_attention_heads=cfg.nheads,
@@ -22,8 +19,8 @@ class CateClassifierl(nn.Module):
             max_position_embeddings=cfg.seq_len,
             type_vocab_size=cfg.type_vocab_size,
         )
-        self.text_emb = BertModel(self.bert_cfg)
-        self.img_emb = nn.Linear(cfg.img_feat_size, cfg.hidden_size)
+        self.text_encoder = BertModel(self.bert_cfg)
+        self.img_encoder = nn.Linear(cfg.img_feat_size, cfg.hidden_size)
                 
         def get_cls(target_size=1):
             return nn.Sequential(
@@ -40,15 +37,15 @@ class CateClassifierl(nn.Module):
         self.d_cls = get_cls(cfg.n_d_cls)
     
     def forward(self, token_ids, token_mask, token_types, img_feat, label=None):
-        text_emb = self.text_emb(token_ids, token_mask, token_types)[0]
-        text_emb = text_emb[:, 0]
-        img_emb = self.img_emb(img_feat)
+        text_output = self.text_encoder(token_ids, token_mask, token_types)[0]
+        text_vec = text_output[:, 0]
+        img_vec = self.img_encoder(img_feat)
         
-        comb_emb = torch.cat([text_emb, img_emb], 1)
-        b_pred = self.b_cls(comb_emb)
-        m_pred = self.m_cls(comb_emb)
-        s_pred = self.s_cls(comb_emb)
-        d_pred = self.d_cls(comb_emb)
+        comb_vec = torch.cat([text_vec, img_vec], 1)
+        b_pred = self.b_cls(comb_vec)
+        m_pred = self.m_cls(comb_vec)
+        s_pred = self.s_cls(comb_vec)
+        d_pred = self.d_cls(comb_vec)
         
         if label is not None:
             loss_func = nn.CrossEntropyLoss(ignore_index=-1)
