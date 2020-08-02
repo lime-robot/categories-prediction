@@ -1,23 +1,25 @@
-import torch
-import torch.nn as nn
+import torch # 파이토치 모듈 임포트
+import torch.nn as nn # 자주 사용하는 torch.nn을 별칭 nn으로 명명
+# 허깅페이스의 트랜스포머에서 BertConfig, BertModel 클래스 임포트
 from transformers.modeling_bert import BertConfig, BertModel
 
-
+# 파이토치로부터 커스텀 모델을 만들기 위해 nn.Module을 상속 받음
 class CateClassifier(nn.Module):
     def __init__(self, cfg):
         super(CateClassifier, self).__init__()
+        # 글로벌 설정값을 멤버 변수로 저장
         self.cfg = cfg
-                
+        # 버트모델의 설정값을 멤버 변수로 저장
         self.bert_cfg = BertConfig( 
-            cfg.vocab_size, 
-            hidden_size=cfg.hidden_size,
-            num_hidden_layers=cfg.nlayers,
-            num_attention_heads=cfg.nheads,
-            intermediate_size=cfg.intermediate_size,
-            hidden_dropout_prob=cfg.dropout,
-            attention_probs_dropout_prob=cfg.dropout,
-            max_position_embeddings=cfg.seq_len,
-            type_vocab_size=cfg.type_vocab_size,
+            cfg.vocab_size, # 사전 크기
+            hidden_size=cfg.hidden_size, # 히든 크기
+            num_hidden_layers=cfg.nlayers, # 레이어 층 수
+            num_attention_heads=cfg.nheads, # 어텐션 헤드의 수
+            intermediate_size=cfg.intermediate_size, # 인터미디어트 크기
+            hidden_dropout_prob=cfg.dropout, # 히든 드롭아웃 확률 값
+            attention_probs_dropout_prob=cfg.dropout, # 어텐션 드롭아웃 확률 값 
+            max_position_embeddings=cfg.seq_len, # 포지션 임베딩의 최대 길이
+            type_vocab_size=cfg.type_vocab_size, # 타입 사전 크기
         )
         self.text_encoder = BertModel(self.bert_cfg)
         self.img_encoder = nn.Linear(cfg.img_feat_size, cfg.hidden_size)
