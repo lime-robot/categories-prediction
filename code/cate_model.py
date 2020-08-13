@@ -44,22 +44,27 @@ class CateClassifier(nn.Module):
         self.s_cls = get_cls(cfg.n_s_cls)
         # 세 카테고리 분류기
         self.d_cls = get_cls(cfg.n_d_cls)
-    
-    # 가변 길이를 가지는 token_ids를 모두 같은 길이로 맞추기 위해 짧은 길이의 token_ids 샘플에 패딩(PADDING)을 추가함
+        
+    # 매개변수 
     # token_ids: 전처리된 상품명을 인덱스로 변환하여 token_ids를 만들었음
     # token_mask: 실제 token_ids의 개수만큼은 1, 나머지는 0으로 채움
-    # token_types: _를 기준으로 서로 다른 타입의 토큰임을 타입 인덱스로 저장
+    # token_types: ▁ 문자를 기준으로 서로 다른 타입의 토큰임을 타입 인덱스로 저장
+    # img_feat: resnet50으로 인코딩된 이미지 피처
+    # label: 정답 대/중/소/세 카테고리    
     def forward(self, token_ids, token_mask, token_types, img_feat, label=None):        
         # 전처리된 상품명을 하나의 텍스트벡터(text_vec)로 변환
         # 반환 튜플(어텐션 웨이트, 시퀀스 아웃풋) 중 시퀀스 아웃풋만 사용
         _, text_output = self.text_encoder(token_ids, token_mask, token_types)
+        
         # 시퀀스 중 첫 타임스탭의 hidden state만 사용. 
         text_vec = text_output[:, 0]
+        
         # img_feat를 텍스트벡터와 결합하기 앞서 선형변환 적용
         img_vec = self.img_encoder(img_feat)
         
         # 이미지벡터와 텍스트벡터를 직렬연결(concatenate)하여 결합벡터 생성
         comb_vec = torch.cat([text_vec, img_vec], 1)
+        
         # 결합된 벡터로 대카테고리 확률분포 예측
         b_pred = self.b_cls(comb_vec)
         # 결합된 벡터로 중카테고리 확률분포 예측
