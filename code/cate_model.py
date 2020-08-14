@@ -1,11 +1,18 @@
-import torch # 파이토치 모듈 임포트
-import torch.nn as nn # 자주 사용하는 torch.nn을 별칭 nn으로 명명
-# 허깅페이스의 트랜스포머에서 BertConfig, BertModel 클래스 임포트
+
+import torch # 파이토치 패키지 임포트
+import torch.nn as nn # 자주 사용하는 torch.nn패키지를 별칭 nn으로 명명
+# 허깅페이스의 트랜스포머 패키지에서 BertConfig, BertModel 클래스 임포트
 from transformers.modeling_bert import BertConfig, BertModel
 
-# 파이토치로부터 커스텀 모델을 만들기 위해 nn.Module을 상속 받음
+
 class CateClassifier(nn.Module):
-    def __init__(self, cfg):
+    """상품정보를 받아서 대/중/소/세 카테고리를 예측하는 모델    
+    """
+    def __init__(self, cfg):        
+        """
+        매개변수
+        cfg: hidden_size, nlayers 등 설정값을 가지고 있는 변수
+        """
         super(CateClassifier, self).__init__()
         # 글로벌 설정값을 멤버 변수로 저장
         self.cfg = cfg
@@ -44,14 +51,17 @@ class CateClassifier(nn.Module):
         self.s_cls = get_cls(cfg.n_s_cls)
         # 세 카테고리 분류기
         self.d_cls = get_cls(cfg.n_d_cls)
-        
-    # 매개변수 
-    # token_ids: 전처리된 상품명을 인덱스로 변환하여 token_ids를 만들었음
-    # token_mask: 실제 token_ids의 개수만큼은 1, 나머지는 0으로 채움
-    # token_types: ▁ 문자를 기준으로 서로 다른 타입의 토큰임을 타입 인덱스로 저장
-    # img_feat: resnet50으로 인코딩된 이미지 피처
-    # label: 정답 대/중/소/세 카테고리    
-    def forward(self, token_ids, token_mask, token_types, img_feat, label=None):        
+    
+    def forward(self, token_ids, token_mask, token_types, img_feat, label=None):
+        """        
+        매개변수
+        token_ids: 전처리된 상품명을 인덱스로 변환하여 token_ids를 만들었음
+        token_mask: 실제 token_ids의 개수만큼은 1, 나머지는 0으로 채움
+        token_types: ▁ 문자를 기준으로 서로 다른 타입의 토큰임을 타입 인덱스로 저장
+        img_feat: resnet50으로 인코딩된 이미지 피처
+        label: 정답 대/중/소/세 카테고리
+        """
+
         # 전처리된 상품명을 하나의 텍스트벡터(text_vec)로 변환
         # 반환 튜플(어텐션 웨이트, 시퀀스 아웃풋) 중 시퀀스 아웃풋만 사용
         _, text_output = self.text_encoder(token_ids, token_mask, token_types)
@@ -74,9 +84,11 @@ class CateClassifier(nn.Module):
         # 결합된 벡터로 세카테고리 확률분포 예측
         d_pred = self.d_cls(comb_vec)
         
-        # 데이터 패러럴 학습에서 GPU 메모리를 효율적으로 사용하기 위해 loss를 모델 내에서 계산함.
+        # 데이터 패러럴 학습에서 GPU 메모리를 효율적으로 사용하기 위해 
+        # loss를 모델 내에서 계산함.
         if label is not None:
-            # 손실(loss) 함수로 CrossEntropyLoss를 사용. label의 값이 -1을 가지는 샘플은 loss계산에 사용 안 함
+            # 손실(loss) 함수로 CrossEntropyLoss를 사용
+            # label의 값이 -1을 가지는 샘플은 loss계산에 사용 안 함
             loss_func = nn.CrossEntropyLoss(ignore_index=-1)
             # label은 batch_size x 4를 (batch_size x 1) 4개로 만듦
             b_label, m_label, s_label, d_label = label.split(1, 1)
