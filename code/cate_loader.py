@@ -47,7 +47,7 @@ class CateDataset(Dataset):
         # ["▁직소퍼즐", "▁1000 조각", "▁바다 거북 의", "▁여행", "▁pl 12 75"] =>
         # [     0     ,     1    1  ,    2     2  2 ,     3   ,   4  4   4 ]
         token_types = [type_id for type_id, word in enumerate(tokens) for _ in word.split()]
-        tokens = " ".join(tokens)
+        tokens = " ".join(tokens) # ▁기호로 분리되기 전의 원래의 tokens으로 되돌림
 
         # 토큰을 토큰에 대응되는 인덱스로 변환
         # "▁직소퍼즐 ▁1000 조각 ▁바다 거북 의 ▁여행 ▁pl 12 75" =>
@@ -81,13 +81,20 @@ class CateDataset(Dataset):
         token_ids = torch.LongTensor(token_ids)
         token_mask = torch.LongTensor(token_mask)
         token_types = torch.LongTensor(token_types)
+        
+        # token_types의 타입 인덱스의 숫자 크기가 type_vocab_size 보다 작도록 바꿈
         token_types[token_types >= self.type_vocab_size] = self.type_vocab_size-1 
         img_feat = torch.FloatTensor(img_feat)
         
+        # 대/중/소/세 라벨 준비
         label = self.labels[idx]
         label = torch.LongTensor(label)
         
+        # 크게 3가지 텍스트 입력, 이미지 입력, 라벨을 반환한다.
         return token_ids, token_mask, token_types, img_feat, label
     
     def __len__(self):
+        """
+          tokens의 개수를 반환한다. 즉, 상품명 문장의 개수를 반환한다.
+        """
         return len(self.tokens)
