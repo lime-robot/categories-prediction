@@ -1,3 +1,4 @@
+
 import os
 os.environ['OMP_NUM_THREADS'] = '24'
 os.environ['NUMEXPR_MAX_THREADS'] = '24'
@@ -19,40 +20,46 @@ import warnings
 warnings.filterwarnings(action='ignore')
 
 
+# 전처리된 데이터가 저장된 디렉터리
 DB_PATH=f'../input/processed'
-MODEL_PATH=f'../models'
+
+# 토큰을 인덱스로 치환할 때 사용될 사전 파일이 저장된 디렉터리 
 VOCAB_DIR=os.path.join(DB_PATH, 'vocab')
 
+# 학습된 모델의 파라미터가 저장될 디렉터리
+MODEL_PATH=f'../models'
 
+
+# 미리 정의된 설정 값
 class CFG:
-    learning_rate=1.0e-4
-    batch_size=16
-    num_workers=14
-    print_freq=100
-    test_freq=1
-    start_epoch=0
-    num_train_epochs=10
-    warmup_steps=100
-    max_grad_norm=10    
-    weight_decay=0.01    
-    dropout=0.2    
-    hidden_size=512
-    intermediate_size=256
-    nlayers=2
-    nheads=8
-    seq_len=64
-    n_b_cls = 57 + 1
-    n_m_cls = 552 + 1
-    n_s_cls = 3190 + 1
-    n_d_cls = 404 + 1
-    vocab_size = 32000
-    img_feat_size = 2048
-    type_vocab_size = 30
-    df_path = os.path.join(DB_PATH, 'train.csv')
+    learning_rate=1.0e-4 # 러닝 레이트
+    batch_size=16 # 배치 사이즈
+    num_workers=4 # 워커의 개수
+    print_freq=100 # 결과 출력 빈도
+    start_epoch=0 # 시작 에폭
+    num_train_epochs=10 # 학습할 에폭수
+    warmup_steps=100 # lr을 서서히 증가시킬 step 수
+    max_grad_norm=10 # 그래디언트 클리핑에 사용
+    weight_decay=0.01
+    dropout=0.2 # dropout 확률
+    hidden_size=512 # 은닉 크기
+    intermediate_size=256 # TRANSFORMER셀의 intermediate 크기
+    nlayers=2 # BERT의 층수
+    nheads=8 # BERT의 head 개수
+    seq_len=64 # 토큰의 최대 길이
+    n_b_cls = 57 + 1 # 대카테고리 개수
+    n_m_cls = 552 + 1 # 중카테고리 개수
+    n_s_cls = 3190 + 1 # 소카테고리 개수
+    n_d_cls = 404 + 1 # 세카테고리 개수
+    vocab_size = 32000 # 토큰의 유니크 인덱스 개수
+    img_feat_size = 2048 # 이미지 피처 벡터의 크기
+    type_vocab_size = 30 # 타입의 유니크 인덱스 개수
+    csv_path = os.path.join(DB_PATH, 'train.csv')
     h5_path = os.path.join(DB_PATH, 'train_img_feat.h5')
 
 
-def main():    
+def main():
+    # 명령행에서 받을 키워드 인자를 설정합니다.    
     parser = argparse.ArgumentParser("")
     parser.add_argument("--model", type=str, default='')
     parser.add_argument("--resume", action='store_true')
@@ -68,9 +75,9 @@ def main():
     parser.add_argument("--fold", type=int, default=0)
     parser.add_argument("--lr", type=float, default=CFG.learning_rate)
     parser.add_argument("--dropout", type=float, default=CFG.dropout)    
-    args = parser.parse_args()
-    #print(args) 
+    args = parser.parse_args()    
     
+    # 키워드 인자로 받은 값을 CFG로 다시 저장합니다.
     CFG.batch_size=args.batch_size
     CFG.num_train_epochs=args.nepochs
     CFG.seq_len=args.seq_len    
@@ -83,6 +90,7 @@ def main():
     CFG.hidden_size =  args.hidden_size    
     print(CFG.__dict__)    
     
+    # 랜덤 시드를 설정하여 매 코드를 실행할 때마다 동일한 결과를 얻게 합니다.
     os.environ['PYTHONHASHSEED'] = str(CFG.seed)
     random.seed(CFG.seed)
     np.random.seed(CFG.seed)
@@ -90,49 +98,49 @@ def main():
     torch.cuda.manual_seed(CFG.seed)
     torch.backends.cudnn.deterministic = True
     
+    # 전처리된 데이터를 읽어옵니다.
     print('loading ...')
-    train_df = pd.read_csv(os.path.join(DB_PATH, 'train.csv'), dtype={'tokens':str})    
+    train_df = pd.read_csv(CFG.csv_path, dtype={'tokens':str})    
     train_df['img_idx'] = train_df.index
-    if 1:
-        train_df['unique_cateid'] = (train_df['bcateid'].astype('str') + train_df['mcateid'].astype('str') + 
-                                                train_df['scateid'].astype('str') + train_df['dcateid'].astype('str'))
-        folds = StratifiedKFold(n_splits=5, random_state=7, shuffle=True)
-        train_idx, valid_idx = list(folds.split(train_df.values, train_df['unique_cateid']))[args.fold]
-        valid_df = train_df.iloc[valid_idx]
-        train_df = train_df.iloc[train_idx]
-    else:
-        train_df, valid_df = train_test_split(train_df, test_size=10000)
-    img_h5_path = os.path.join(DB_PATH, 'train_img_feat.h5')
     
+    # 대/중/소/세 카테고리를 결합하여 유니크 카테고리를 만듭니다.
+    train_df['unique_cateid'] = (train_df['bcateid'].astype('str') + 
+                                train_df['mcateid'].astype('str') + 
+                                train_df['scateid'].astype('str') + 
+                                train_df['dcateid'].astype('str'))
+
+    # StratifiedKFold을 사용해 데이터셋을 학습셋(train_df)과 검증셋(valid_df)으로 나눕니다.
+    folds = StratifiedKFold(n_splits=5, random_state=7, shuffle=True)
+    train_idx, valid_idx = list(folds.split(train_df.values, train_df['unique_cateid']))[args.fold]
+    valid_df = train_df.iloc[valid_idx]
+    train_df = train_df.iloc[train_idx]
+    
+    # 토큰을 대응되는 인덱스로 치환할 때 사용될 딕셔너리를 로딩합니다.
     vocab = [line.split('\t')[0] for line in open(os.path.join(VOCAB_DIR, 'spm.vocab')).readlines()]
     token2id = dict([(w, i) for i, w in enumerate(vocab)])
     print('loading ... done')
-        
+    
+    # 카테고리 분류기 모델을 생성합니다.
     model = cate_model.CateClassifier(CFG)
-    if args.model != "":
-        print("=> loading checkpoint '{}'".format(args.model))
-        checkpoint = torch.load(args.model)        
-        state_dict = checkpoint['state_dict']
-        if args.resume:
-            CFG.start_epoch = checkpoint['epoch']                
-        model.load_state_dict(state_dict, strict=False)        
-        print("=> loaded checkpoint '{}' (epoch {})"
-              .format(args.model, checkpoint['epoch']))        
     
-    model.cuda()
-    model._dropout = CFG.dropout
-    print('model.dropout:', model._dropout)
+    # 모델의 파라미터를 GPU메모리로 옮깁니다.
+    model.cuda()    
     
+    # 모델의 파라미터 수를 출력합니다.
     def count_parameters(model):
         return sum(p.numel() for p in model.parameters() if p.requires_grad)
     print('parameters: ', count_parameters(model))
     
+    # GPU가 2개 이상이면 데이터패러럴로 학습 가능하게 만듭니다.
     n_gpu = torch.cuda.device_count()
     if n_gpu > 1:
         model = torch.nn.DataParallel(model)
-    train_db = cate_loader.CateDataset(train_df, img_h5_path, token2id, CFG.seq_len, CFG.type_vocab_size)
-    valid_db = cate_loader.CateDataset(valid_df, img_h5_path, token2id, CFG.seq_len, CFG.type_vocab_size)
+
+    # 학습에 적합한 형태의 샘플을 가져오는 데이터셋을 만듭니다.
+    train_db = cate_loader.CateDataset(train_df, CFG.h5_path, token2id, CFG.seq_len, CFG.type_vocab_size)
+    valid_db = cate_loader.CateDataset(valid_df, CFG.h5_path, token2id, CFG.seq_len, CFG.type_vocab_size)
     
+    # 파이토치에서 제공하는 데이터로더로 여러개의 워커로 배치 생성이 가능    
     train_loader = DataLoader(
         train_db, batch_size=CFG.batch_size, shuffle=True, drop_last=True,
         num_workers=CFG.num_workers, pin_memory=True)
@@ -141,43 +149,45 @@ def main():
         valid_db, batch_size=CFG.batch_size, shuffle=False,
         num_workers=CFG.num_workers, pin_memory=False)
     
+    # 학습 동안 수행될 총 스텝 수
+    # 데이터셋을 배치크기로 나눈 것이 1에폭 동안 스텝 수
+    # 총 스텝 수 = 1에폭 스텝 수 * 총 에폭 수
     num_train_optimization_steps = int(
         len(train_db) / CFG.batch_size) * (CFG.num_train_epochs)
     print('num_train_optimization_steps', num_train_optimization_steps)    
-    
-    # Prepare optimizer
-    param_optimizer = list(model.named_parameters())
+
+    # 파라미터 그룹핑 정보 생성
+    # 웨이트 디케이 미적용 파라미터 그룹과 적용 파라미터로 나눔
+    param_optimizer = list(model.named_parameters())    
     no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
     optimizer_grouped_parameters = [
         {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
         {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
         ]
     
+    # AdamW 옵티마이저 생성
     optimizer = AdamW(optimizer_grouped_parameters,
                            lr=CFG.learning_rate,
                            weight_decay=CFG.weight_decay,                           
                            )
 
+    # learning_rate가 선형적으로 감소하는 스케줄러 생성
     scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=CFG.warmup_steps,
                                         num_training_steps=num_train_optimization_steps
                                      )
     print('use WarmupLinearSchedule ...')
     
-    def get_lr():        
+    def get_lr():    
         return scheduler.get_lr()[0]
     
-    if args.model != "":
-        log_df = checkpoint['log']
-        del checkpoint
-    else:
-        log_df = pd.DataFrame()     
-    os.makedirs('log', exist_ok=True)
-    
+    log_df = pd.DataFrame()
     curr_lr = get_lr()    
     print(f'initial learning rate:{curr_lr}')
-            
-    for epoch in range(CFG.start_epoch, CFG.num_train_epochs):       
+    
+    # num_train_epochs - start_epoch 횟수 만큼 학습을 진행합니다.
+    for epoch in range(CFG.start_epoch, CFG.num_train_epochs):
         
+        # 한 에폭의 결과가 집계된 한 행을 반환합니다.
         def get_log_row_df(epoch, lr, train_res, valid_res):
             log_row = {'EPOCH':epoch, 'LR':lr,
                        'TRAIN_LOSS':train_res[0], 'TRAIN_OACC':train_res[1],
@@ -188,35 +198,44 @@ def main():
                        'VALID_SACC':valid_res[4], 'VALID_DACC':valid_res[5],
                        }
             return pd.DataFrame(log_row, index=[0])             
-            
-        train_res = train(train_loader, model, optimizer, epoch, scheduler)
-        valid_res = validate(valid_loader, model)
-        curr_lr = get_lr()       
-        print(f'set the learning_rate: {curr_lr}')      
         
-        if epoch % CFG.test_freq == 0 and epoch >= 0:
-            log_row_df = get_log_row_df(epoch, curr_lr, train_res, valid_res)
-            log_df = log_df.append(log_row_df, sort=False)
-            print(log_df.tail(20))
-            
-            curr_model_name = (f'b{CFG.batch_size}_h{CFG.hidden_size}_'
-                               f'd{CFG.dropout}_l{CFG.nlayers}_hd{CFG.nheads}_'
-                               f'ep{epoch}_s{CFG.seed}_fold{args.fold}.pt')
-            model_to_save = model.module if hasattr(model, 'module') else model  # Only save the cust_model it-self
-                        
-            save_checkpoint({
-                'epoch': epoch + 1,
-                'arch': 'transformer',
-                'state_dict': model_to_save.state_dict(),
-                'log': log_df,
-                },
-                MODEL_PATH, curr_model_name,
-            )
+        # 학습을 진행하고 loss나 accuracy와 같은 결과를 반환합니다.
+        train_res = train(train_loader, model, optimizer, epoch, scheduler)
+        # 검증을 진행하고 loss나 accuracy와 같은 결과를 반환합니다.
+        valid_res = validate(valid_loader, model)
+        curr_lr = get_lr()
+        print(f'set the learning_rate: {curr_lr}')
+        
+        log_row_df = get_log_row_df(epoch, curr_lr, train_res, valid_res)
+        # log_df에 결과가 집계된 한 행을 추가합니다.
+        log_df = log_df.append(log_row_df, sort=False)
+        print(log_df.tail(10)) # log_df의 최신 10개 행만 출력합니다.
+        
+        # 모델의 파라미터가 저장될 파일의 이름을 정합니다.
+        curr_model_name = (f'b{CFG.batch_size}_h{CFG.hidden_size}_'
+                            f'd{CFG.dropout}_l{CFG.nlayers}_hd{CFG.nheads}_'
+                            f'ep{epoch}_s{CFG.seed}_fold{args.fold}.pt')
+        # torch.nn.DataParallel로 감싸진 경우 원래의 model을 가져옵니다.
+        model_to_save = model.module if hasattr(model, 'module') else model  
+        
+        # 모델의 파라미터를 저장합니다.
+        save_checkpoint({
+            'epoch': epoch + 1,
+            'arch': 'transformer',
+            'state_dict': model_to_save.state_dict(),
+            'log': log_df,
+            },
+            MODEL_PATH, curr_model_name,
+        )
             
     print('done')
 
 
 def calc_cate_acc(pred, label):
+    """
+    대/중/소/세 카테고리별 정확도와 전체(overall) 정확도를 반환
+    전체 정확도는 대회 평가 방법과 동일한 가중치로 계산
+    """
     b_pred, m_pred, s_pred, d_pred= pred    
     _, b_idx = b_pred.max(1)
     _, m_idx = m_pred.max(1)
@@ -233,6 +252,15 @@ def calc_cate_acc(pred, label):
 
 
 def train(train_loader, model, optimizer, epoch, scheduler):
+    """    
+    한 에폭 단위로 학습을 시킵니다.
+
+    매개변수
+    train_loader: 학습 데이터셋에서 배치(미니배치) 불러옵니다.
+    model: 학습될 파라미터를 가진 딥러닝 모델
+    optimizer: 파라미터를 업데이트 시키는 역할
+    scheduler: learning_rate를 감소시키는 역할
+    """
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
@@ -244,7 +272,7 @@ def train(train_loader, model, optimizer, epoch, scheduler):
     
     sent_count = AverageMeter()
     
-    # switch to train mode
+    # 학습 모드로 교체
     model.train()
 
     start = end = time.time()
