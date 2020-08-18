@@ -5,7 +5,6 @@ os.environ['NUMEXPR_MAX_THREADS'] = '24'
 import time
 import math
 import torch
-import logging
 import random
 import argparse
 import cate_loader
@@ -13,7 +12,7 @@ import cate_model
 import numpy as np
 import pandas as pd
 from torch.utils.data import DataLoader
-from sklearn.model_selection import StratifiedKFold, train_test_split
+from sklearn.model_selection import StratifiedKFold
 from transformers import AdamW, get_linear_schedule_with_warmup
 
 import warnings
@@ -137,8 +136,10 @@ def main():
         model = torch.nn.DataParallel(model)
 
     # 학습에 적합한 형태의 샘플을 가져오는 데이터셋을 만듭니다.
-    train_db = cate_loader.CateDataset(train_df, CFG.h5_path, token2id, CFG.seq_len, CFG.type_vocab_size)
-    valid_db = cate_loader.CateDataset(valid_df, CFG.h5_path, token2id, CFG.seq_len, CFG.type_vocab_size)
+    train_db = cate_loader.CateDataset(train_df, CFG.h5_path, token2id, 
+                                       CFG.seq_len, CFG.type_vocab_size)
+    valid_db = cate_loader.CateDataset(valid_df, CFG.h5_path, token2id, 
+                                       CFG.seq_len, CFG.type_vocab_size)
     
     # 파이토치에서 제공하는 데이터로더로 여러개의 워커로 배치 생성이 가능    
     train_loader = DataLoader(
@@ -161,9 +162,11 @@ def main():
     param_optimizer = list(model.named_parameters())    
     no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
     optimizer_grouped_parameters = [
-        {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
-        {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
-        ]
+        {'params':[p for n, p in param_optimizer if not any(nd in n for nd in no_decay)],
+         'weight_decay': 0.01},
+        {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 
+         'weight_decay': 0.0}
+    ]
     
     # AdamW 옵티마이저 생성
     optimizer = AdamW(optimizer_grouped_parameters,
@@ -172,9 +175,9 @@ def main():
                            )
 
     # learning_rate가 선형적으로 감소하는 스케줄러 생성
-    scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=CFG.warmup_steps,
-                                        num_training_steps=num_train_optimization_steps
-                                     )
+    scheduler = get_linear_schedule_with_warmup(optimizer, 
+                                                num_warmup_steps=CFG.warmup_steps,
+                                                num_training_steps=num_train_optimization_steps)
     print('use WarmupLinearSchedule ...')
     
     def get_lr():    
@@ -281,8 +284,8 @@ def train(train_loader, model, optimizer, epoch, scheduler):
         # measure data loading time
         data_time.update(time.time() - end)
         
-        token_ids, token_mask, token_types, img_feat, label = (token_ids.cuda(), 
-                                                  token_mask.cuda(), token_types.cuda(), img_feat.cuda(), label.cuda())
+        token_ids, token_mask, token_types, img_feat, label = (
+            token_ids.cuda(), token_mask.cuda(), token_types.cuda(), img_feat.cuda(), label.cuda())
                 
         batch_size = token_ids.size(0)   
                 
@@ -361,8 +364,8 @@ def validate(valid_loader, model):
         # measure data loading time
         data_time.update(time.time() - end)
         
-        token_ids, token_mask, token_types, img_feat, label = (token_ids.cuda(), 
-                                                  token_mask.cuda(), token_types.cuda(), img_feat.cuda(), label.cuda())
+        token_ids, token_mask, token_types, img_feat, label = (
+            token_ids.cuda(), token_mask.cuda(), token_types.cuda(), img_feat.cuda(), label.cuda())
         
         batch_size = token_ids.size(0)
         
@@ -408,16 +411,6 @@ def validate(valid_loader, model):
                    ))        
     return (losses.avg, o_accuracies.avg, b_accuracies.avg, m_accuracies.avg, 
             s_accuracies.avg, d_accuracies.avg)
-
-
-def get_logger():
-    FORMAT = '[%(levelname)s]%(asctime)s:%(name)s:%(message)s'
-    logging.basicConfig(format=FORMAT, level=logging.INFO)
-    logger = logging.getLogger('main')
-    logger.setLevel(logging.DEBUG)
-    return logger
-
-logger = get_logger()
 
 
 def save_checkpoint(state, model_path, model_filename, is_best=False):
@@ -467,8 +460,6 @@ def adjust_learning_rate(optimizer, epoch):
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr    
     return lr
-
-
 
 
 if __name__ == '__main__':
