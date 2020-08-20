@@ -63,8 +63,8 @@ class CateClassifier(nn.Module):
         """
 
         # 전처리된 상품명을 하나의 텍스트벡터(text_vec)로 변환
-        # 반환 튜플(어텐션 웨이트, 시퀀스 아웃풋) 중 시퀀스 아웃풋만 사용
-        _, text_output = self.text_encoder(token_ids, token_mask, token_types)
+        # 반환 튜플(시퀀스 아웃풋, 풀드 아웃풋) 중 시퀀스 아웃풋만 참조 
+        text_output = self.text_encoder(token_ids, token_mask, token_types)[0]
         
         # 시퀀스 중 첫 타임스탭의 hidden state만 사용. 
         text_vec = text_output[:, 0]

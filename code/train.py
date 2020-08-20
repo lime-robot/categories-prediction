@@ -32,8 +32,8 @@ MODEL_PATH=f'../models'
 # 미리 정의된 설정 값
 class CFG:
     learning_rate=1.0e-4 # 러닝 레이트
-    batch_size=16 # 배치 사이즈
-    num_workers=4 # 워커의 개수
+    batch_size=1024 # 배치 사이즈
+    num_workers=8 # 워커의 개수
     print_freq=100 # 결과 출력 빈도
     start_epoch=0 # 시작 에폭
     num_train_epochs=10 # 학습할 에폭수
