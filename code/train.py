@@ -100,7 +100,7 @@ def main():
     # 전처리된 데이터를 읽어옵니다.
     print('loading ...')
     train_df = pd.read_csv(CFG.csv_path, dtype={'tokens':str})    
-    train_df['img_idx'] = train_df.index
+    train_df['img_idx'] = train_df.index # 몇 번째 행인지 img_idx 칼럼에 기록
     
     # 대/중/소/세 카테고리를 결합하여 유니크 카테고리를 만듭니다.
     train_df['unique_cateid'] = (train_df['bcateid'].astype('str') + 
@@ -118,6 +118,21 @@ def main():
     vocab = [line.split('\t')[0] for line in open(os.path.join(VOCAB_DIR, 'spm.vocab')).readlines()]
     token2id = dict([(w, i) for i, w in enumerate(vocab)])
     print('loading ... done')
+
+    # 학습에 적합한 형태의 샘플을 가져오는 데이터셋을 만듭니다.
+    train_db = cate_loader.CateDataset(train_df, CFG.h5_path, token2id, 
+                                       CFG.seq_len, CFG.type_vocab_size)
+    valid_db = cate_loader.CateDataset(valid_df, CFG.h5_path, token2id, 
+                                       CFG.seq_len, CFG.type_vocab_size)
+    
+    # 파이토치에서 제공하는 데이터로더로 여러개의 워커로 배치 생성이 가능    
+    train_loader = DataLoader(
+        train_db, batch_size=CFG.batch_size, shuffle=True, drop_last=True,
+        num_workers=CFG.num_workers, pin_memory=True)
+    
+    valid_loader = DataLoader(
+        valid_db, batch_size=CFG.batch_size, shuffle=False,
+        num_workers=CFG.num_workers, pin_memory=False)
     
     # 카테고리 분류기 모델을 생성합니다.
     model = cate_model.CateClassifier(CFG)
@@ -134,21 +149,6 @@ def main():
     n_gpu = torch.cuda.device_count()
     if n_gpu > 1:
         model = torch.nn.DataParallel(model)
-
-    # 학습에 적합한 형태의 샘플을 가져오는 데이터셋을 만듭니다.
-    train_db = cate_loader.CateDataset(train_df, CFG.h5_path, token2id, 
-                                       CFG.seq_len, CFG.type_vocab_size)
-    valid_db = cate_loader.CateDataset(valid_df, CFG.h5_path, token2id, 
-                                       CFG.seq_len, CFG.type_vocab_size)
-    
-    # 파이토치에서 제공하는 데이터로더로 여러개의 워커로 배치 생성이 가능    
-    train_loader = DataLoader(
-        train_db, batch_size=CFG.batch_size, shuffle=True, drop_last=True,
-        num_workers=CFG.num_workers, pin_memory=True)
-    
-    valid_loader = DataLoader(
-        valid_db, batch_size=CFG.batch_size, shuffle=False,
-        num_workers=CFG.num_workers, pin_memory=False)
     
     # 학습 동안 수행될 총 스텝 수
     # 데이터셋을 배치크기로 나눈 것이 1에폭 동안 스텝 수
