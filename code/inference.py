@@ -173,27 +173,37 @@ def inference(dev_loader, model_list):
 
     start = end = time.time()
     
+    # 배치별 예측한 대/중/소/세 카테고리의 인덱스를 리스트로 가집니다.
     pred_idx_list = []
+    
+    # dev_loader에서 반복해서 배치 데이터를 받아옵니다.
+    # CateDataset의 __getitem__() 함수의 반환 값과 동일한 변수 반환
     for step, (token_ids, token_mask, token_types, img_feat, _) in enumerate(dev_loader):
-        # measure data loading time
+        # 데이터 로딩 시간 기록
         data_time.update(time.time() - end)
         
+        # 배치 데이터의 위치를 CPU메모리에서 GPU메모리로 이동
         token_ids, token_mask, token_types, img_feat = (token_ids.cuda(), 
                                                   token_mask.cuda(), token_types.cuda(), img_feat.cuda())
         
         batch_size = token_ids.size(0)
         
-        with torch.no_grad():            
+        # with문 내에서는 그래디언트 계산을 하지 않도록 함
+        with torch.no_grad():
             pred_list = []
+            # model 별 예측치를 pred_list에 추가합니다.
             for model in model_list:
                 _, pred = model(token_ids, token_mask, token_types, img_feat)
                 pred_list.append(pred)
             
-            pred = ensemble(pred_list)                
+            # 예측치 리스트를 앙상블 하여 하나의 예측치로 만듭니다.
+            pred = ensemble(pred_list)
+            # 예측치에서 카테고리별 인덱스를 가져옵니다.
             pred_idx = get_pred_idx(pred)
+            # 현재 배치(미니배치)에서 얻어진 카테고리별 인덱스를 pred_idx_list에 추가
             pred_idx_list.append(pred_idx.cpu())
             
-        # measure elapsed time
+        # 소요시간 측정
         batch_time.update(time.time() - end)
         end = time.time()
 
@@ -210,8 +220,9 @@ def inference(dev_loader, model_list):
                    remain=timeSince(start, float(step+1)/len(dev_loader)),
                    sent_s=sent_count.avg/batch_time.avg
                    ))
-    pred_idx = torch.cat(pred_idx_list).numpy()    
     
+    # 배치별로 얻어진 카테고리 인덱스 리스트를 직렬연결하여 하나의 카테고리 인덱스로 변환
+    pred_idx = torch.cat(pred_idx_list).numpy()
     return pred_idx
 
 
