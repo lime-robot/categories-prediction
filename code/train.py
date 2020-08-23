@@ -183,11 +183,11 @@ def main():
     def get_lr():    
         return scheduler.get_lr()[0]
     
-    log_df = pd.DataFrame()
+    log_df = pd.DataFrame() # 에폭 별 실험결과 로그를 저장할 데이터 프레임
     curr_lr = get_lr()    
     print(f'initial learning rate:{curr_lr}')
     
-    # num_train_epochs - start_epoch 횟수 만큼 학습을 진행합니다.
+    # (num_train_epochs - start_epoch) 횟수 만큼 학습을 진행합니다.
     for epoch in range(CFG.start_epoch, CFG.num_train_epochs):
         
         # 한 에폭의 결과가 집계된 한 행을 반환합니다.
@@ -221,37 +221,17 @@ def main():
         # torch.nn.DataParallel로 감싸진 경우 원래의 model을 가져옵니다.
         model_to_save = model.module if hasattr(model, 'module') else model  
         
-        # 모델의 파라미터를 저장합니다.
-        save_checkpoint({
-            'epoch': epoch + 1,
-            'arch': 'transformer',
-            'state_dict': model_to_save.state_dict(),
-            'log': log_df,
-            },
-            MODEL_PATH, curr_model_name,
-        )
-            
-    print('done')
+    print('training done')
 
-
-def calc_cate_acc(pred, label):
-    """
-    대/중/소/세 카테고리별 정확도와 전체(overall) 정확도를 반환
-    전체 정확도는 대회 평가 방법과 동일한 가중치로 계산
-    """
-    b_pred, m_pred, s_pred, d_pred= pred    
-    _, b_idx = b_pred.max(1)
-    _, m_idx = m_pred.max(1)
-    _, s_idx = s_pred.max(1)
-    _, d_idx = d_pred.max(1)
-        
-    b_acc = (b_idx == label[:, 0]).sum().item() / (label[:, 0]>0).sum().item()
-    m_acc = (m_idx == label[:, 1]).sum().item() / (label[:, 1]>0).sum().item()
-            
-    s_acc = (s_idx == label[:, 2]).sum().item() / ((label[:, 2]>0).sum().item()+1e-06)
-    d_acc = (d_idx == label[:, 3]).sum().item() / ((label[:, 3]>0).sum().item()+1e-06)    
-    o_acc = (b_acc + 1.2*m_acc + 1.3*s_acc + 1.4*d_acc)/4
-    return o_acc, b_acc, m_acc, s_acc, d_acc
+    # 모델의 파라미터를 저장합니다.
+    save_checkpoint({
+        'epoch': epoch + 1,
+        'arch': 'transformer',
+        'state_dict': model_to_save.state_dict(),
+        'log': log_df,
+        },
+        MODEL_PATH, curr_model_name,
+    )
 
 
 def train(train_loader, model, optimizer, epoch, scheduler):
@@ -264,52 +244,63 @@ def train(train_loader, model, optimizer, epoch, scheduler):
     optimizer: 파라미터를 업데이트 시키는 역할
     scheduler: learning_rate를 감소시키는 역할
     """
-    batch_time = AverageMeter()
-    data_time = AverageMeter()
-    losses = AverageMeter()
-    o_accuracies = AverageMeter() # overall
-    b_accuracies = AverageMeter()
-    m_accuracies = AverageMeter()
-    s_accuracies = AverageMeter()
-    d_accuracies = AverageMeter()
+    # AverageMeter는 지금까지 입력 받은 전체 수의 평균 값 반환 용도
+    batch_time = AverageMeter()     # 한 배치처리 시간 집계
+    data_time = AverageMeter()      # 데이터 로딩 시간 집계
+    losses = AverageMeter()         # 손실 값 집계
+    o_accuracies = AverageMeter()   # 대회 평가 방법으로 집계
+    b_accuracies = AverageMeter()   # 대카테고리 정확도 집계
+    m_accuracies = AverageMeter()   # 중카테고리 정확도 집계
+    s_accuracies = AverageMeter()   # 소카테고리 정확도 집계
+    d_accuracies = AverageMeter()   # 세카테고리 정확도 집계
     
-    sent_count = AverageMeter()
+    sent_count = AverageMeter()     # 문장 처리 개수 집계
     
     # 학습 모드로 교체
     model.train()
 
     start = end = time.time()
     
+    # train_loader에서 반복해서 학습용 배치 데이터를 받아옵니다.
+    # CateDataset의 __getitem__() 함수의 반환 값과 동일한 변수 반환
     for step, (token_ids, token_mask, token_types, img_feat, label) in enumerate(train_loader):
-        # measure data loading time
+        # 데이터 로딩 시간 기록
         data_time.update(time.time() - end)
         
+        # 배치 데이터의 위치를 CPU메모리에서 GPU메모리로 이동
         token_ids, token_mask, token_types, img_feat, label = (
             token_ids.cuda(), token_mask.cuda(), token_types.cuda(), img_feat.cuda(), label.cuda())
                 
         batch_size = token_ids.size(0)   
                 
-        # compute loss
+        # model은 배치 데이터를 입력 받아서 예측 결과 및 loss 반환
+        # model은 인스턴스이나 __call__함수가 추가돼 함수처럼 호출이 가능합니다. 
+        # CateClassifier의 __call__ 함수 내에서 forward 함수가 호출됩니다. 
         loss, pred = model(token_ids, token_mask, token_types, img_feat, label)
-        loss = loss.mean()
+        loss = loss.mean() # Multi-GPU 학습의 경우 mean() 호출 필요
                 
-        # record loss
+        # loss 값을 기록
         losses.update(loss.item(), batch_size)
         
+        # 역전파 수행
         loss.backward()
+
+        # CFG.max_grad_norm 이상의 값을 가지는 그래디언트 값 클리핑
         grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), CFG.max_grad_norm)
               
-        scheduler.step()
-        optimizer.step()
-        optimizer.zero_grad()
+        scheduler.step()    # 스케쥴러로 learning_rate 조절
+        optimizer.step()    # 옵티마이저로 파라미터 업데이터
+        optimizer.zero_grad() # 옵티마이저 내의 그래디언트 초기화
 
-        # measure elapsed time
+        # 소요시간 측정
         batch_time.update(time.time() - end)
         end = time.time()
 
         sent_count.update(batch_size)
 
+        # CFG.print_freq 주기대로 결과 로그를 출력
         if step % CFG.print_freq == 0 or step == (len(train_loader)-1):
+            # 대/중/소/세가 예측된 pred와 정답 label로 정확도 계산 및 집계
             o_acc, b_acc, m_acc, s_acc, d_acc = calc_cate_acc(pred, label)
             o_accuracies.update(o_acc, batch_size)
             b_accuracies.update(b_acc, batch_size)
@@ -338,51 +329,63 @@ def train(train_loader, model, optimizer, epoch, scheduler):
                    grad_norm=grad_norm,
                    lr=scheduler.get_lr()[0],                   
                    sent_s=sent_count.avg/batch_time.avg
-                   ))        
+                   ))
+    # 학습 동안 집계된 결과 반환
     return (losses.avg, o_accuracies.avg, b_accuracies.avg, m_accuracies.avg, 
             s_accuracies.avg, d_accuracies.avg) 
 
 
 def validate(valid_loader, model):
-    batch_time = AverageMeter()
-    data_time = AverageMeter()
-    losses = AverageMeter()
-    o_accuracies = AverageMeter() # overall
-    b_accuracies = AverageMeter()
-    m_accuracies = AverageMeter()
-    s_accuracies = AverageMeter()
-    d_accuracies = AverageMeter()
+    """    
+    한 에폭 단위로 검증합니다.
+
+    매개변수
+    valid_loader: 검증 데이터셋에서 배치(미니배치) 불러옵니다.
+    model: train 함수에서 학습된 딥러닝 모델
+    """    
+    batch_time = AverageMeter()     # 한 배치처리 시간 집계
+    data_time = AverageMeter()      # 데이터 로딩 시간 집계
+    losses = AverageMeter()         # 손실 값 집계
+    o_accuracies = AverageMeter()   # 대회 평가 방법으로 집계
+    b_accuracies = AverageMeter()   # 대카테고리 정확도 집계
+    m_accuracies = AverageMeter()   # 중카테고리 정확도 집계
+    s_accuracies = AverageMeter()   # 소카테고리 정확도 집계
+    d_accuracies = AverageMeter()   # 세카테고리 정확도 집계
     
-    sent_count = AverageMeter()
+    sent_count = AverageMeter()     # 문장 처리 개수 집계
     
-    # switch to evaluation mode
+    # 평가(evaluation) 모드로 교체
+    # 드롭아웃이나 배치정규화가 일관된 값을 내도록 함
     model.eval()
 
     start = end = time.time()
         
     for step, (token_ids, token_mask, token_types, img_feat, label) in enumerate(valid_loader):
-        # measure data loading time
+        # 데이터 로딩 시간 기록
         data_time.update(time.time() - end)
         
+        # 배치 데이터의 위치를 CPU메모리에서 GPU메모리로 이동
         token_ids, token_mask, token_types, img_feat, label = (
             token_ids.cuda(), token_mask.cuda(), token_types.cuda(), img_feat.cuda(), label.cuda())
         
         batch_size = token_ids.size(0)
         
+        # 아래 블록 내에서는 그래디언트 계산을 하지 않도록 함
         with torch.no_grad():
-            # compute loss
+            # model은 배치 데이터를 입력 받아서 예측 결과 및 loss 반환
             loss, pred = model(token_ids, token_mask, token_types, img_feat, label)
             loss = loss.mean()
                 
-        # record loss
+        # loss 값을 기록
         losses.update(loss.item(), batch_size)
         
-        # measure elapsed time
+        # 소요시간 측정
         batch_time.update(time.time() - end)
         end = time.time()
 
         sent_count.update(batch_size)
 
+        # CFG.print_freq 주기대로 결과 로그를 출력
         if step % CFG.print_freq == 0 or step == (len(valid_loader)-1):
             o_acc, b_acc, m_acc, s_acc, d_acc = calc_cate_acc(pred, label)
             o_accuracies.update(o_acc, batch_size)
@@ -408,9 +411,30 @@ def validate(valid_loader, model):
                    s_acc=s_accuracies, d_acc=d_accuracies,
                    remain=timeSince(start, float(step+1)/len(valid_loader)),
                    sent_s=sent_count.avg/batch_time.avg
-                   ))        
+                   ))
+    # 검증 동안 집계된 결과 반환
     return (losses.avg, o_accuracies.avg, b_accuracies.avg, m_accuracies.avg, 
             s_accuracies.avg, d_accuracies.avg)
+
+
+def calc_cate_acc(pred, label):
+    """
+    대/중/소/세 카테고리별 정확도와 전체(overall) 정확도를 반환
+    전체 정확도는 대회 평가 방법과 동일한 가중치로 계산
+    """
+    b_pred, m_pred, s_pred, d_pred= pred    
+    _, b_idx = b_pred.max(1)
+    _, m_idx = m_pred.max(1)
+    _, s_idx = s_pred.max(1)
+    _, d_idx = d_pred.max(1)
+        
+    b_acc = (b_idx == label[:, 0]).sum().item() / (label[:, 0]>0).sum().item()
+    m_acc = (m_idx == label[:, 1]).sum().item() / (label[:, 1]>0).sum().item()
+            
+    s_acc = (s_idx == label[:, 2]).sum().item() / ((label[:, 2]>0).sum().item()+1e-06)
+    d_acc = (d_idx == label[:, 3]).sum().item() / ((label[:, 3]>0).sum().item()+1e-06)    
+    o_acc = (b_acc + 1.2*m_acc + 1.3*s_acc + 1.4*d_acc)/4
+    return o_acc, b_acc, m_acc, s_acc, d_acc
 
 
 def save_checkpoint(state, model_path, model_filename, is_best=False):
@@ -452,14 +476,6 @@ def timeSince(since, percent):
     es = s / (percent)
     rs = es - s
     return '%s (remain %s)' % (asMinutes(s), asMinutes(rs))
-
-
-def adjust_learning_rate(optimizer, epoch):  
-    #lr  = CFG.learning_rate     
-    lr = (CFG.lr_decay)**(epoch//10) * CFG.learning_rate    
-    for param_group in optimizer.param_groups:
-        param_group['lr'] = lr    
-    return lr
 
 
 if __name__ == '__main__':
