@@ -1,3 +1,4 @@
+
 import os
 os.environ['OMP_NUM_THREADS'] = '24'
 os.environ['NUMEXPR_MAX_THREADS'] = '24'
@@ -11,54 +12,57 @@ import time
 import random
 import numpy as np
 import pandas as pd
-
 from torch.utils.data import DataLoader
-
 import warnings
 warnings.filterwarnings(action='ignore')
-
 import argparse
-import logging
 
 
-SETTINGS = json.load(open('SETTINGS.json')) # 세팅 정보를 읽어 온다.
-RAW_DATA_DIR = SETTINGS['RAW_DATA_DIR'] # 카카오에서 다운로드 받은 데이터의 디렉터리
-PROCESSED_DATA_DIR = SETTINGS['PROCESSED_DATA_DIR'] # 전처리된 데이터가 저장될 디렉터리
-VOCAB_DIR = SETTINGS['VOCAB_DIR'] # 전처리에 사용될 사전 파일이 저장될 디렉터리
-SUBMISSION_DIR = SETTINGS['SUBMISSION_DIR'] # 전처리에 사용될 사전 파일이 저장될 디렉터리
+# 전처리된 데이터가 저장된 디렉터리
+DB_DIR = '../input/processed'
+
+# 토큰을 인덱스로 치환할 때 사용될 사전 파일이 저장된 디렉터리 
+VOCAB_DIR = os.path.join(DB_DIR, 'vocab')
+
+# 학습된 모델의 파라미터가 저장될 디렉터리
+MODEL_DIR = '../model'
+
+# 제출할 예측결과가 저장될 디렉터리
+SUBMISSION_DIR = '../submission'
 
 
+# 미리 정의된 설정 값
 class CFG:
-    learning_rate=1.0e-3
-    batch_size=16
-    num_workers=14
-    print_freq=100
-    test_freq=1
-    start_epoch=0
-    num_train_epochs=5    
-    warmup_steps=100
-    max_grad_norm=10
-    gradient_accumulation_steps=1
-    weight_decay=0.01    
-    dropout=0.2    
-    hidden_size=512
-    intermediate_size=256
-    nlayers=2
-    nheads=8
-    seq_len=64
-    n_b_cls = 57 + 1
-    n_m_cls = 552 + 1
-    n_s_cls = 3190 + 1
-    n_d_cls = 404 + 1
-    vocab_size = 32000
-    img_feat_size = 2048
-    type_vocab_size = 30
+    learning_rate=1.0e-4 # 러닝 레이트
+    batch_size=1024 # 배치 사이즈
+    num_workers=8 # 워커의 개수
+    print_freq=100 # 결과 출력 빈도
+    start_epoch=0 # 시작 에폭
+    num_train_epochs=10 # 학습할 에폭수
+    warmup_steps=100 # lr을 서서히 증가시킬 step 수
+    max_grad_norm=10 # 그래디언트 클리핑에 사용
+    weight_decay=0.01
+    dropout=0.2 # dropout 확률
+    hidden_size=512 # 은닉 크기
+    intermediate_size=256 # TRANSFORMER셀의 intermediate 크기
+    nlayers=2 # BERT의 층수
+    nheads=8 # BERT의 head 개수
+    seq_len=64 # 토큰의 최대 길이
+    n_b_cls = 57 + 1 # 대카테고리 개수
+    n_m_cls = 552 + 1 # 중카테고리 개수
+    n_s_cls = 3190 + 1 # 소카테고리 개수
+    n_d_cls = 404 + 1 # 세카테고리 개수
+    vocab_size = 32000 # 토큰의 유니크 인덱스 개수
+    img_feat_size = 2048 # 이미지 피처 벡터의 크기
+    type_vocab_size = 30 # 타입의 유니크 인덱스 개수
+    csv_path = os.path.join(DB_DIR, 'dev.csv') # 전처리 돼 저장된 dev 데이터셋    
+    h5_path = os.path.join(DB_DIR, 'dev_img_feat.h5')
 
 
-def main():    
+def main():
+    # 명령행에서 받을 키워드 인자를 설정합니다.
     parser = argparse.ArgumentParser("")
-    parser.add_argument("--model_dir", type=str, required=True)
-    parser.add_argument("--prefix", type=str, default='dev')
+    parser.add_argument("--model_dir", type=str, default=MODEL_DIR)    
     parser.add_argument("--batch_size", type=int, default=CFG.batch_size)   
     parser.add_argument("--seq_len", type=int, default=CFG.seq_len)
     parser.add_argument("--seed", type=int, default=7)
@@ -81,6 +85,7 @@ def main():
     CFG.res_dir=f'res_dir_{args.k}'
     print(CFG.__dict__)    
     
+    # 랜덤 시드를 설정하여 매 코드를 실행할 때마다 동일한 결과를 얻게 합니다.
     os.environ['PYTHONHASHSEED'] = str(CFG.seed)
     random.seed(CFG.seed)
     np.random.seed(CFG.seed)
@@ -88,24 +93,28 @@ def main():
     torch.cuda.manual_seed(CFG.seed)
     torch.backends.cudnn.deterministic = True
     
+    # 전처리된 데이터를 읽어옵니다.
     print('loading ...')
-    valid_df = pd.read_csv(os.path.join(PROCESSED_DATA_DIR, f'{args.prefix}.csv'), dtype={'tokens':str})     
-    valid_df['img_idx'] = valid_df.index
-    img_h5_path = os.path.join(PROCESSED_DATA_DIR, f'{args.prefix}_img_feat.h5')
+    dev_df = pd.read_csv(CFG.csv_path, dtype={'tokens':str})     
+    dev_df['img_idx'] = dev_df.index
+    img_h5_path = CFG.h5_path
     
     vocab = [line.split('\t')[0] for line in open(os.path.join(VOCAB_DIR, 'spm.vocab')).readlines()]
     token2id = dict([(w, i) for i, w in enumerate(vocab)])    
     print('loading ... done')
         
+    # 찾아진 모델 파일의 개수만큼 모델을 만들어서 파이썬 리스트에 추가합니다.
     model_list = []
+    # args.model_dir에 있는 확장자 .pt를 가지는 모든 모델 파일의 경로를 읽습니다.
     model_path_list = glob.glob(os.path.join(args.model_dir, '*.pt'))
+    # 모델 경로 개수만큼 모델을 생성하여 파이썬 리스트에 추가합니다. 
     for model_path in model_path_list:
-        model = cate_model.CateClassifierl(CFG)
+        model = cate_model.CateClassifier(CFG)
         if model_path != "":
             print("=> loading checkpoint '{}'".format(model_path))
             checkpoint = torch.load(model_path)        
-            state_dict = checkpoint['state_dict']
-            model.load_state_dict(state_dict, strict=True)        
+            state_dict = checkpoint['state_dict']                
+            model.load_state_dict(state_dict, strict=True)  
             print("=> loaded checkpoint '{}' (epoch {})"
                   .format(model_path, checkpoint['epoch']))
         model.cuda()
@@ -117,69 +126,55 @@ def main():
         print('Please check the model directory.')
         return
     
+    # 모델의 파라미터 수를 출력합니다.
     def count_parameters(model):
         return sum(p.numel() for p in model.parameters() if p.requires_grad)
     print('parameters: ', count_parameters(model_list[0]))    
     
-    valid_db = cate_loader.CateDataset(valid_df, img_h5_path, token2id, CFG.seq_len, 
+    # 모델의 입력에 적합한 형태의 샘플을 가져오는 CateDataset의 인스턴스를 만듭니다.
+    dev_db = cate_loader.CateDataset(dev_df, img_h5_path, token2id, CFG.seq_len, 
                                        CFG.type_vocab_size)
     
-    valid_loader = DataLoader(
-        valid_db, batch_size=CFG.batch_size, shuffle=False,
+    # 여러 개의 워커로 빠르게 배치(미니배치)를 생성하도록 DataLoader로 
+    # CateDataset 인스턴스를 감싸 줍니다.    
+    dev_loader = DataLoader(
+        dev_db, batch_size=CFG.batch_size, shuffle=False,
         num_workers=CFG.num_workers, pin_memory=True)    
     
-    pred_idx = validate(valid_loader, model_list)
+    # dev 데이터셋의 모든 상품명에 대해 예측된 카테고리 인덱스를 반환합니다.
+    pred_idx = inference(dev_loader, model_list)
     
+    # dev 데이터셋의 상품ID별 예측된 카테고리를 붙여서 제출 파일을 생성하여 저장합니다. 
     cate_cols = ['bcateid', 'mcateid', 'scateid', 'dcateid'] 
-    valid_df[cate_cols] = pred_idx
+    dev_df[cate_cols] = pred_idx
     os.makedirs(SUBMISSION_DIR, exist_ok=True)
-    submission_path = os.path.join(SUBMISSION_DIR, f'{args.prefix}.tsv')
-    valid_df[['pid'] + cate_cols].to_csv(submission_path, sep='\t', header=False, index=False)
+    submission_path = os.path.join(SUBMISSION_DIR, 'dev.tsv')
+    dev_df[['pid'] + cate_cols].to_csv(submission_path, sep='\t', header=False, index=False)
             
     print('done')
 
 
-def get_pred_idx(pred):
-    b_pred, m_pred, s_pred, d_pred= pred    
-    _, b_idx = b_pred.max(1)
-    _, m_idx = m_pred.max(1)
-    _, s_idx = s_pred.max(1)
-    _, d_idx = d_pred.max(1)
-    pred_idx = torch.stack([b_idx, m_idx, s_idx, d_idx], 1)    
-    return pred_idx
-
-
-def blend_pred_list(pred_list, t=0.5):
-    b_pred, m_pred, s_pred, d_pred = 0, 0, 0, 0
-    for pred in pred_list:
-        b_pred += torch.softmax(pred[0], 1) ** t
-        m_pred += torch.softmax(pred[1], 1) ** t
-        s_pred += torch.softmax(pred[2], 1) ** t
-        d_pred += torch.softmax(pred[3], 1) ** t
-    b_pred /= len(pred_list)
-    m_pred /= len(pred_list)
-    s_pred /= len(pred_list)
-    d_pred /= len(pred_list)
-    pred = [b_pred, m_pred, s_pred, d_pred]    
-    return pred
-
-
-def validate(valid_loader, model_list):
+def inference(dev_loader, model_list):
+    """
+    dev 데이터셋의 모든 상품명에 대해 여러 모델들의 예측한 결과를 앙상블 하여 정확도가 개선된
+    카테고리 인덱스를 반환합니다.
+    
+    매개변수
+    dev_loader: dev 데이터셋에서 배치(미니배치) 불러옵니다.
+    model_list: args.model_dir에서 불러온 모델 리스트 
+    """
     batch_time = AverageMeter()
     data_time = AverageMeter()    
     sent_count = AverageMeter()
     
-    # switch to evaluation mode
+    # 모딜 리스트의 모든 모델을 평가(evaluation) 모드로 동작하게 합니다.
     for model in model_list:
         model.eval()
 
     start = end = time.time()
     
     pred_idx_list = []
-    
-    sum_img_feat = 0
-    sum_token_ids = 0
-    for step, (token_ids, token_mask, token_types, img_feat, _) in enumerate(valid_loader):
+    for step, (token_ids, token_mask, token_types, img_feat, _) in enumerate(dev_loader):
         # measure data loading time
         data_time.update(time.time() - end)
         
@@ -188,17 +183,13 @@ def validate(valid_loader, model_list):
         
         batch_size = token_ids.size(0)
         
-        sum_img_feat += img_feat.sum().item()
-        sum_token_ids += token_ids.sum().item()
-        
-        with torch.no_grad():
-            # compute loss
+        with torch.no_grad():            
             pred_list = []
             for model in model_list:
                 _, pred = model(token_ids, token_mask, token_types, img_feat)
                 pred_list.append(pred)
             
-            pred = blend_pred_list(pred_list)                
+            pred = ensemble(pred_list)                
             pred_idx = get_pred_idx(pred)
             pred_idx_list.append(pred_idx.cpu())
             
@@ -208,41 +199,20 @@ def validate(valid_loader, model_list):
 
         sent_count.update(batch_size)
 
-        if step % CFG.print_freq == 0 or step == (len(valid_loader)-1):
+        if step % CFG.print_freq == 0 or step == (len(dev_loader)-1):
             print('TEST: {0}/{1}] '
                   'Data {data_time.val:.3f} ({data_time.avg:.3f}) '
                   'Elapsed {remain:s} '                  
                   'sent/s {sent_s:.0f} '
                   .format(
-                   step+1, len(valid_loader), batch_time=batch_time,                   
+                   step+1, len(dev_loader), batch_time=batch_time,                   
                    data_time=data_time,
-                   remain=timeSince(start, float(step+1)/len(valid_loader)),
+                   remain=timeSince(start, float(step+1)/len(dev_loader)),
                    sent_s=sent_count.avg/batch_time.avg
                    ))
-    pred_idx = torch.cat(pred_idx_list).numpy()
-    
-    print(sum_img_feat, sum_token_ids)
+    pred_idx = torch.cat(pred_idx_list).numpy()    
     
     return pred_idx
-
-
-def get_logger():
-    FORMAT = '[%(levelname)s]%(asctime)s:%(name)s:%(message)s'
-    logging.basicConfig(format=FORMAT, level=logging.INFO)
-    logger = logging.getLogger('main')
-    logger.setLevel(logging.DEBUG)
-    return logger
-
-logger = get_logger()
-
-
-def save_checkpoint(state, model_path, model_filename, is_best=False):
-    print('saving cust_model ...')
-    if not os.path.exists(model_path):
-        os.makedirs(model_path)
-    torch.save(state, os.path.join(model_path, model_filename))
-    if is_best:
-        torch.save(state, os.path.join(model_path, 'best_' + model_filename))
 
 
 class AverageMeter(object):
@@ -263,6 +233,37 @@ class AverageMeter(object):
         self.avg = self.sum / self.count
 
 
+def get_pred_idx(pred):
+    b_pred, m_pred, s_pred, d_pred= pred    
+    _, b_idx = b_pred.max(1)
+    _, m_idx = m_pred.max(1)
+    _, s_idx = s_pred.max(1)
+    _, d_idx = d_pred.max(1)
+    pred_idx = torch.stack([b_idx, m_idx, s_idx, d_idx], 1)    
+    return pred_idx
+
+
+# 예측된 대/중/소/세 결과들을 앙상블합니다. 
+# 앙상블 방법으로 간단히 산술 평균을 사용합니다.
+def ensemble(pred_list):
+    b_pred, m_pred, s_pred, d_pred = 0, 0, 0, 0    
+    for pred in pred_list:
+        # softmax를 적용해 대/중/소/세 각 카테고리별 모든 클래스의 합이 1이 되도록 정규화 합니다.
+        # 참고로 정규화된 pred[0]은 대카테고리의 클래스별 확률값을 가지는 확률분포 함수라 볼 수 있습니다.     
+        b_pred += torch.softmax(pred[0], 1)
+        m_pred += torch.softmax(pred[1], 1)
+        s_pred += torch.softmax(pred[2], 1)
+        d_pred += torch.softmax(pred[3], 1)
+    b_pred /= len(pred_list)    # 모델별 '대카테고리의 정규화된 예측값'들의 평균 계산
+    m_pred /= len(pred_list)   # 모델별 '중카테고리의 정규화된 예측값'들의 평균 계산
+    s_pred /= len(pred_list)    # 모델별 '소카테고리의 정규화된 예측값'들의 평균 계산
+    d_pred /= len(pred_list)    # 모델별 '세카테고리의 정규화된 예측값'들의 평균 계산  
+    
+    # 앙상블 결과 반환 
+    pred = [b_pred, m_pred, s_pred, d_pred]    
+    return pred
+
+
 def asMinutes(s):
     m = math.floor(s / 60)
     s -= m * 60
@@ -275,16 +276,6 @@ def timeSince(since, percent):
     es = s / (percent)
     rs = es - s
     return '%s (remain %s)' % (asMinutes(s), asMinutes(rs))
-
-
-def adjust_learning_rate(optimizer, epoch):  
-    #lr  = CFG.learning_rate     
-    lr = (CFG.lr_decay)**(epoch//10) * CFG.learning_rate    
-    for param_group in optimizer.param_groups:
-        param_group['lr'] = lr    
-    return lr
-
-
 
 
 if __name__ == '__main__':
