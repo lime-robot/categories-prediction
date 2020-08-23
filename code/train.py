@@ -371,7 +371,7 @@ def validate(valid_loader, model):
         
         batch_size = token_ids.size(0)
         
-        # 아래 블록 내에서는 그래디언트 계산을 하지 않도록 함
+        # with문 내에서는 그래디언트 계산을 하지 않도록 함
         with torch.no_grad():
             # model은 배치 데이터를 입력 받아서 예측 결과 및 loss 반환
             loss, pred = model(token_ids, token_mask, token_types, img_feat, label)
