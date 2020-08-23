@@ -26,7 +26,7 @@ DB_PATH=f'../input/processed'
 VOCAB_DIR=os.path.join(DB_PATH, 'vocab')
 
 # 학습된 모델의 파라미터가 저장될 디렉터리
-MODEL_PATH=f'../models'
+MODEL_PATH=f'../model'
 
 
 # 미리 정의된 설정 값
@@ -58,7 +58,7 @@ class CFG:
 
 
 def main():
-    # 명령행에서 받을 키워드 인자를 설정합니다.    
+    # 명령행에서 받을 키워드 인자를 설정합니다.
     parser = argparse.ArgumentParser("")
     parser.add_argument("--model", type=str, default='')
     parser.add_argument("--resume", action='store_true')
@@ -119,13 +119,14 @@ def main():
     token2id = dict([(w, i) for i, w in enumerate(vocab)])
     print('loading ... done')
 
-    # 학습에 적합한 형태의 샘플을 가져오는 데이터셋을 만듭니다.
+    # 학습에 적합한 형태의 샘플을 가져오는 CateDataset의 인스턴스를 만듭니다.
     train_db = cate_loader.CateDataset(train_df, CFG.h5_path, token2id, 
                                        CFG.seq_len, CFG.type_vocab_size)
     valid_db = cate_loader.CateDataset(valid_df, CFG.h5_path, token2id, 
                                        CFG.seq_len, CFG.type_vocab_size)
-    
-    # 파이토치에서 제공하는 데이터로더로 여러개의 워커로 배치 생성이 가능    
+     
+    # 여러 개의 워커로 빠르게 배치(미니배치)를 생성하도록 DataLoader로 
+    # CateDataset 인스턴스를 감싸 줍니다.    
     train_loader = DataLoader(
         train_db, batch_size=CFG.batch_size, shuffle=True, drop_last=True,
         num_workers=CFG.num_workers, pin_memory=True)
