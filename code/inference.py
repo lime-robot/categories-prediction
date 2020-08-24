@@ -32,17 +32,11 @@ SUBMISSION_DIR = '../submission'
 
 
 # 미리 정의된 설정 값
-class CFG:
-    learning_rate=1.0e-4 # 러닝 레이트
+class CFG:    
     batch_size=1024 # 배치 사이즈
     num_workers=8 # 워커의 개수
-    print_freq=100 # 결과 출력 빈도
-    start_epoch=0 # 시작 에폭
-    num_train_epochs=10 # 학습할 에폭수
-    warmup_steps=100 # lr을 서서히 증가시킬 step 수
-    max_grad_norm=10 # 그래디언트 클리핑에 사용
-    weight_decay=0.01
-    dropout=0.2 # dropout 확률
+    print_freq=100 # 결과 출력 빈도    
+    warmup_steps=100 # lr을 서서히 증가시킬 step 수        
     hidden_size=512 # 은닉 크기
     intermediate_size=256 # TRANSFORMER셀의 intermediate 크기
     nlayers=2 # BERT의 층수
@@ -69,14 +63,11 @@ def main():
     parser.add_argument("--nlayers", type=int, default=CFG.nlayers)
     parser.add_argument("--nheads", type=int, default=CFG.nheads)
     parser.add_argument("--hidden_size", type=int, default=CFG.hidden_size)    
-    parser.add_argument("--k", type=int, default=0)
-    parser.add_argument("--lr", type=float, default=CFG.learning_rate)
-    parser.add_argument("--dropout", type=float, default=CFG.dropout)    
+    parser.add_argument("--k", type=int, default=0)    
     args = parser.parse_args()
     print(args) 
     
-    CFG.batch_size=args.batch_size
-    CFG.dropout=args.dropout
+    CFG.batch_size=args.batch_size    
     CFG.seed =  args.seed        
     CFG.nlayers =  args.nlayers    
     CFG.nheads =  args.nheads
@@ -226,24 +217,6 @@ def inference(dev_loader, model_list):
     return pred_idx
 
 
-class AverageMeter(object):
-    """Computes and stores the average and current value"""
-    def __init__(self):
-        self.reset()
-
-    def reset(self):
-        self.val = 0
-        self.avg = 0
-        self.sum = 0
-        self.count = 0
-
-    def update(self, val, n=1):
-        self.val = val
-        self.sum += val * n
-        self.count += n
-        self.avg = self.sum / self.count
-
-
 def get_pred_idx(pred):
     b_pred, m_pred, s_pred, d_pred= pred    
     _, b_idx = b_pred.max(1)
@@ -273,6 +246,24 @@ def ensemble(pred_list):
     # 앙상블 결과 반환 
     pred = [b_pred, m_pred, s_pred, d_pred]    
     return pred
+
+
+class AverageMeter(object):
+    """Computes and stores the average and current value"""
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.val = 0
+        self.avg = 0
+        self.sum = 0
+        self.count = 0
+
+    def update(self, val, n=1):
+        self.val = val
+        self.sum += val * n
+        self.count += n
+        self.avg = self.sum / self.count
 
 
 def asMinutes(s):
