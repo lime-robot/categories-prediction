@@ -6,9 +6,10 @@
 아래처럼 대회에서 다운로드 받은 파일이 위치해야 합니다. 
 
 ```
-input/
+categories-prediction/
+└── input
     ├── README.md
-    └── raw_data/
+    └── raw_data
         ├── cate1.json
         ├── dev.chunk.01
         ├── test.chunk.01
