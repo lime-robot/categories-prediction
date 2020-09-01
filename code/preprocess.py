@@ -2,6 +2,7 @@ import os
 import re
 import json
 import h5py
+import logging
 import numpy as np
 import pandas as pd
 import sentencepiece as spm
@@ -36,6 +37,15 @@ TEST_FILE_LIST = [
     "test.chunk.01",
     "test.chunk.02", 
 ]
+
+
+def get_logger():
+    FORMAT = '[%(levelname)s]%(asctime)s:%(name)s:%(message)s'
+    logging.basicConfig(format=FORMAT, level=logging.INFO)
+    logger = logging.getLogger('main')
+    logger.setLevel(logging.DEBUG)
+    return logger
+logger = get_logger()
 
 
 # 문장의 특수기호 제거 함수
@@ -119,7 +129,7 @@ def preprocess():
     os.makedirs(PROCESSED_DATA_DIR, exist_ok=True)
     os.makedirs(VOCAB_DIR, exist_ok=True)
     
-    print('loading ...')
+    logger.info('loading ...')
     train_df = get_dataframe(train_path_list, 'train')
     dev_df = get_dataframe(dev_path_list, 'dev')
     test_df = get_dataframe(test_path_list, 'test')
@@ -133,7 +143,7 @@ def preprocess():
 
     # product.txt 파일로 sentencepiece 모델을 학습 시킨다. 
     # 학습이 완료되면 spm.model, spm.vocab 파일이 생성된다.
-    print('training sentencepiece model ...')
+    logger.info('training sentencepiece model ...')
     train_spm(txt_path=os.path.join(VOCAB_DIR, 'product.txt'), 
               spm_path=os.path.join(VOCAB_DIR, 'spm')) # spm 접두어
     
@@ -143,9 +153,9 @@ def preprocess():
     # 필요한 파일이 제대로 생성됐는지 확인
     for dirname, _, filenames in os.walk(VOCAB_DIR):
         for filename in filenames:
-            print(os.path.join(dirname, filename))
+            logger.info(os.path.join(dirname, filename))
 
-    print('tokenizing product ...')
+    logger.info('tokenizing product ...')
     # 센텐스피스 모델을 로드한다.
     sp = spm.SentencePieceProcessor()
     sp.Load(os.path.join(VOCAB_DIR, 'spm.model'))
@@ -175,7 +185,7 @@ def preprocess():
     dev_df.to_csv(os.path.join(PROCESSED_DATA_DIR, 'dev.csv'), index=False) 
     test_df.to_csv(os.path.join(PROCESSED_DATA_DIR, 'test.csv'), index=False)
     
-    print('processing img_feat ...')
+    logger.info('processing img_feat ...')
     save_column_data(train_path_list, div='train', col='img_feat', n_img_rows=len(train_df), 
                      output_path=os.path.join(PROCESSED_DATA_DIR, 'train_img_feat.h5'))
     save_column_data(dev_path_list, div='dev', col='img_feat', n_img_rows=len(dev_df), 
@@ -185,7 +195,7 @@ def preprocess():
     # 파일이 제대로 생성됐는지 확인
     for dirname, _, filenames in os.walk(PROCESSED_DATA_DIR):
         for filename in filenames:
-            print(os.path.join(dirname, filename))
+            logger.info(os.path.join(dirname, filename))
     
 
 if __name__ == '__main__':
