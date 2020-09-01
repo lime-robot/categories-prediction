@@ -62,27 +62,17 @@ def get_column_data(path_list, div, col):
 def get_dataframe(path_list, div):
     pids = get_column_data(path_list, div, col='pid')
     products = get_column_data(path_list, div, col='product')
-    brands = get_column_data(path_list, div, col='brand')
-    makers = get_column_data(path_list, div, col='maker')
-    models = get_column_data(path_list, div, col='model')
-    prices = get_column_data(path_list, div, col='price')
-    updttms = get_column_data(path_list, div, col='updttm')
     bcates = get_column_data(path_list, div, col='bcateid')
     mcates = get_column_data(path_list, div, col='mcateid')
     scates = get_column_data(path_list, div, col='scateid')
     dcates = get_column_data(path_list, div, col='dcateid')
     
-    df = pd.DataFrame({'pid': pids, 'product':products, 'brand':brands, 'maker':makers, 
-                                      'model':models, 'price':prices, 'updttm':updttms, 
+    df = pd.DataFrame({'pid': pids, 'product':products,  
                                       'bcateid':bcates, 'mcateid':mcates, 'scateid':scates, 'dcateid':dcates} )
     
     # 바이트 열로 인코딩 상품제목과 상품ID를 유니코드 변환한다.
     df['pid'] = df['pid'].map(lambda x: x.decode('utf-8'))
-    df['product'] = df['product'].map(lambda x: x.decode('utf-8'))
-    df['brand'] = df['brand'].map(lambda x: x.decode('utf-8'))
-    df['maker'] = df['maker'].map(lambda x: x.decode('utf-8'))
-    df['model'] = df['model'].map(lambda x: x.decode('utf-8')) 
-    df['updttm'] = df['updttm'].map(lambda x: x.decode('utf-8'))
+    df['product'] = df['product'].map(lambda x: x.decode('utf-8'))    
     return df
 
 
@@ -134,26 +124,6 @@ def preprocess():
     dev_df = get_dataframe(dev_path_list, 'dev')
     test_df = get_dataframe(test_path_list, 'test')
 
-    # 카테고리 이름과 ID의 매핑 정보를 불러온다.
-    cate_json = json.load(open(os.path.join(RAW_DATA_DIR, 'cate1.json')))
-
-    # (이름, ID) 순서를 (ID, 이름)으로 바꾼 후 dictionary로 만든다.
-    bid2nm = dict([(cid, name) for name, cid in cate_json['b'].items()])
-    mid2nm = dict([(cid, name) for name, cid in cate_json['m'].items()])
-    sid2nm = dict([(cid, name) for name, cid in cate_json['s'].items()])
-    did2nm = dict([(cid, name) for name, cid in cate_json['d'].items()])
-    
-    # dictionary를 활용해 카테고리 ID에 해당하는 카테고리 이름 컬럼을 추가한다.
-    train_df['bcatenm'] = train_df['bcateid'].map(bid2nm)
-    train_df['mcatenm'] = train_df['mcateid'].map(mid2nm)
-    train_df['scatenm'] = train_df['scateid'].map(sid2nm)
-    train_df['dcatenm'] = train_df['dcateid'].map(did2nm)    
-    
-    # 불필요한 컬럼을 제거한 DataFrame 생성
-    train_df = train_df[['pid', 'product', 'bcateid', 'mcateid', 'scateid', 'dcateid']]
-    dev_df = dev_df[['pid', 'product', 'bcateid', 'mcateid', 'scateid', 'dcateid']]
-    test_df = test_df[['pid', 'product', 'bcateid', 'mcateid', 'scateid', 'dcateid']]
-    
     # product 칼럼에 특수기호를 제거하는 함수를 적용한 결과를 반환한다.
     train_df['product'] = train_df['product'].map(remove_special_characters)
 
