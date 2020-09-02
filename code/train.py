@@ -1,7 +1,5 @@
 
 import os
-os.environ['OMP_NUM_THREADS'] = '24'
-os.environ['NUMEXPR_MAX_THREADS'] = '24'
 import time
 import math
 import torch
@@ -12,7 +10,7 @@ import cate_model
 import numpy as np
 import pandas as pd
 from torch.utils.data import DataLoader
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import StratifiedKFold, KFold
 from transformers import AdamW, get_linear_schedule_with_warmup
 
 import warnings
@@ -60,9 +58,7 @@ class CFG:
 def main():
     # 명령행에서 받을 키워드 인자를 설정합니다.
     parser = argparse.ArgumentParser("")
-    parser.add_argument("--model", type=str, default='')
-    parser.add_argument("--resume", action='store_true')
-    parser.add_argument("--eval", action='store_true')
+    parser.add_argument("--model", type=str, default='')        
     parser.add_argument("--batch_size", type=int, default=CFG.batch_size)    
     parser.add_argument("--nepochs", type=int, default=CFG.num_train_epochs)    
     parser.add_argument("--seq_len", type=int, default=CFG.seq_len)
@@ -70,8 +66,9 @@ def main():
     parser.add_argument("--seed", type=int, default=7)        
     parser.add_argument("--nlayers", type=int, default=CFG.nlayers)
     parser.add_argument("--nheads", type=int, default=CFG.nheads)
-    parser.add_argument("--hidden_size", type=int, default=CFG.hidden_size)    
+    parser.add_argument("--hidden_size", type=int, default=CFG.hidden_size)
     parser.add_argument("--fold", type=int, default=0)
+    parser.add_argument("--stratified", action='store_true')
     parser.add_argument("--lr", type=float, default=CFG.learning_rate)
     parser.add_argument("--dropout", type=float, default=CFG.dropout)    
     args = parser.parse_args()    
@@ -102,15 +99,20 @@ def main():
     train_df = pd.read_csv(CFG.csv_path, dtype={'tokens':str})    
     train_df['img_idx'] = train_df.index # 몇 번째 행인지 img_idx 칼럼에 기록
     
-    # 대/중/소/세 카테고리를 결합하여 유니크 카테고리를 만듭니다.
-    train_df['unique_cateid'] = (train_df['bcateid'].astype('str') + 
-                                train_df['mcateid'].astype('str') + 
-                                train_df['scateid'].astype('str') + 
-                                train_df['dcateid'].astype('str'))
-
-    # StratifiedKFold을 사용해 데이터셋을 학습셋(train_df)과 검증셋(valid_df)으로 나눕니다.
-    folds = StratifiedKFold(n_splits=5, random_state=7, shuffle=True)
-    train_idx, valid_idx = list(folds.split(train_df.values, train_df['unique_cateid']))[args.fold]
+    # StratifiedKFold 사용
+    if args.stratified:
+        # 대/중/소/세 카테고리를 결합하여 유니크 카테고리를 만듭니다.
+        train_df['unique_cateid'] = (train_df['bcateid'].astype('str') +
+                                     train_df['mcateid'].astype('str') + 
+                                     train_df['scateid'].astype('str') + 
+                                     train_df['dcateid'].astype('str'))
+    
+        # StratifiedKFold을 사용해 데이터셋을 학습셋(train_df)과 검증셋(valid_df)으로 나눕니다.
+        folds = StratifiedKFold(n_splits=5, random_state=CFG.seed, shuffle=True)
+    else:
+        # KFold을 사용해 데이터셋을 학습셋(train_df)과 검증셋(valid_df)으로 나눕니다.
+        folds = KFold(n_splits=5, random_state=CFG.seed, shuffle=True)
+    train_idx, valid_idx = list(folds.split(train_df.values))[args.fold]
     valid_df = train_df.iloc[valid_idx]
     train_df = train_df.iloc[train_idx]
     
