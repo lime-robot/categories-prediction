@@ -38,6 +38,7 @@ class CFG:
     print_freq=100 # 결과 출력 빈도    
     warmup_steps=100 # lr을 서서히 증가시킬 step 수        
     hidden_size=512 # 은닉 크기
+    dropout=0.2 # dropout 확률
     intermediate_size=256 # TRANSFORMER셀의 intermediate 크기
     nlayers=2 # BERT의 층수
     nheads=8 # BERT의 head 개수
