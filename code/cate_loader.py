@@ -47,6 +47,11 @@ class CateDataset(Dataset):
         # ["▁직소퍼즐", "▁1000 조각", "▁바다 거북 의", "▁여행", "▁pl 12 75"] =>
         # [     0     ,     1    1  ,    2     2  2 ,     3   ,   4  4   4 ]
         token_types = [type_id for type_id, word in enumerate(tokens) for _ in word.split()]
+        
+        # ▁ 기호 별 포지션 ID 부여
+        # ["▁직소퍼즐", "▁1000 조각", "▁바다 거북 의", "▁여행", "▁pl 12 75"] =>
+        # [     0     ,     0    1  ,    0     1  2 ,     0   ,   0  1   2 ]
+        position_ids = [pos_id for word in tokens for pos_id, _ in enumerate(word.split())]
         tokens = " ".join(tokens) # ▁기호로 분리되기 전의 원래의 tokens으로 되돌림
 
         # 토큰을 토큰에 대응되는 인덱스로 변환
@@ -60,7 +65,8 @@ class CateDataset(Dataset):
         
         # token_ids의 길이가 max_len보다 길면 잘라서 버림
         if len(token_ids) > self.tokens_max_len:
-            token_ids = token_ids[:self.tokens_max_len]         
+            token_ids = token_ids[:self.tokens_max_len]
+            position_ids = position_ids[:self.tokens_max_len]         
             token_types = token_types[:self.tokens_max_len]
         
         # token_ids의 길이가 max_len보다 짧으면 짧은만큼 PAD값 0 값으로 채워넣음
@@ -69,6 +75,7 @@ class CateDataset(Dataset):
         token_pad = [0] * (self.tokens_max_len - len(token_ids))
         token_ids += token_pad
         token_mask += token_pad
+        position_ids += token_pad # max_len 보다 짧은만큼 PAD 추가
         token_types += token_pad # max_len 보다 짧은만큼 PAD 추가
 
         # h5파일에서 이미지 인덱스에 해당하는 img_feat를 가져옴
@@ -81,6 +88,7 @@ class CateDataset(Dataset):
         token_ids = torch.LongTensor(token_ids)
         token_mask = torch.LongTensor(token_mask)
         token_types = torch.LongTensor(token_types)
+        position_ids = torch.LongTensor(position_ids)
         
         # token_types의 타입 인덱스의 숫자 크기가 type_vocab_size 보다 작도록 바꿈
         token_types[token_types >= self.type_vocab_size] = self.type_vocab_size-1 
@@ -91,7 +99,7 @@ class CateDataset(Dataset):
         label = torch.LongTensor(label)
         
         # 크게 3가지 텍스트 입력, 이미지 입력, 라벨을 반환한다.
-        return token_ids, token_mask, token_types, img_feat, label
+        return token_ids, token_mask, position_ids, token_types, img_feat, label
     
     def __len__(self):
         """
