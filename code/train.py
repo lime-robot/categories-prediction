@@ -101,18 +101,21 @@ def main():
     
     # StratifiedKFold 사용
     if args.stratified:
+        print('use StratifiedKFold ...')
         # 대/중/소/세 카테고리를 결합하여 유니크 카테고리를 만듭니다.
         train_df['unique_cateid'] = (train_df['bcateid'].astype('str') +
                                      train_df['mcateid'].astype('str') + 
                                      train_df['scateid'].astype('str') + 
-                                     train_df['dcateid'].astype('str'))
+                                     train_df['dcateid'].astype('str')).astype('category')
+        train_df['unique_cateid'] = train_df['unique_cateid'].cat.codes
     
         # StratifiedKFold을 사용해 데이터셋을 학습셋(train_df)과 검증셋(valid_df)으로 나눕니다.
         folds = StratifiedKFold(n_splits=5, random_state=CFG.seed, shuffle=True)
+        train_idx, valid_idx = list(folds.split(train_df.values, train_df['unique_cateid']))[args.fold]
     else:
         # KFold을 사용해 데이터셋을 학습셋(train_df)과 검증셋(valid_df)으로 나눕니다.
         folds = KFold(n_splits=5, random_state=CFG.seed, shuffle=True)
-    train_idx, valid_idx = list(folds.split(train_df.values))[args.fold]
+        train_idx, valid_idx = list(folds.split(train_df.values))[args.fold]
     valid_df = train_df.iloc[valid_idx]
     train_df = train_df.iloc[train_idx]
     
