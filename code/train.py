@@ -271,13 +271,13 @@ def train(train_loader, model, optimizer, epoch, scheduler):
     
     # train_loader에서 반복해서 학습용 배치 데이터를 받아옵니다.
     # CateDataset의 __getitem__() 함수의 반환 값과 동일한 변수 반환
-    for step, (token_ids, token_mask, position_ids, token_types, img_feat, label) in enumerate(train_loader):
+    for step, (token_ids, token_mask, token_types, img_feat, label) in enumerate(train_loader):
         # 데이터 로딩 시간 기록
         data_time.update(time.time() - end)
         
         # 배치 데이터의 위치를 CPU메모리에서 GPU메모리로 이동
-        token_ids, token_mask, position_ids, token_types, img_feat, label = (
-            token_ids.cuda(), token_mask.cuda(), position_ids.cuda(), token_types.cuda(), 
+        token_ids, token_mask, token_types, img_feat, label = (
+            token_ids.cuda(), token_mask.cuda(), token_types.cuda(), 
             img_feat.cuda(), label.cuda())
                 
         batch_size = token_ids.size(0)   
@@ -285,7 +285,7 @@ def train(train_loader, model, optimizer, epoch, scheduler):
         # model은 배치 데이터를 입력 받아서 예측 결과 및 loss 반환
         # model은 인스턴스이나 __call__함수가 추가돼 함수처럼 호출이 가능합니다. 
         # CateClassifier의 __call__ 함수 내에서 forward 함수가 호출됩니다. 
-        loss, pred = model(token_ids, token_mask, position_ids, token_types, img_feat, label)
+        loss, pred = model(token_ids, token_mask, token_types, img_feat, label)
         loss = loss.mean() # Multi-GPU 학습의 경우 mean() 호출 필요
                 
         # loss 값을 기록
@@ -369,13 +369,13 @@ def validate(valid_loader, model):
 
     start = end = time.time()
         
-    for step, (token_ids, token_mask, position_ids, token_types, img_feat, label) in enumerate(valid_loader):
+    for step, (token_ids, token_mask, token_types, img_feat, label) in enumerate(valid_loader):
         # 데이터 로딩 시간 기록
         data_time.update(time.time() - end)
         
         # 배치 데이터의 위치를 CPU메모리에서 GPU메모리로 이동
-        token_ids, token_mask, position_ids, token_types, img_feat, label = (
-            token_ids.cuda(), token_mask.cuda(), position_ids.cuda(), token_types.cuda(), 
+        token_ids, token_mask, token_types, img_feat, label = (
+            token_ids.cuda(), token_mask.cuda(), token_types.cuda(), 
             img_feat.cuda(), label.cuda())
         
         batch_size = token_ids.size(0)
@@ -383,7 +383,7 @@ def validate(valid_loader, model):
         # with문 내에서는 그래디언트 계산을 하지 않도록 함
         with torch.no_grad():
             # model은 배치 데이터를 입력 받아서 예측 결과 및 loss 반환
-            loss, pred = model(token_ids, token_mask, position_ids, token_types, img_feat, label)
+            loss, pred = model(token_ids, token_mask, token_types, img_feat, label)
             loss = loss.mean()
                 
         # loss 값을 기록

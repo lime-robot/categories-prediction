@@ -36,11 +36,12 @@ class CateClassifier(nn.Module):
         # 분류기(Classifier) 생성기
         def get_cls(target_size=1):
             return nn.Sequential(
-                nn.Linear(cfg.hidden_size*2, cfg.hidden_size),
-                nn.LayerNorm(cfg.hidden_size),
-                nn.Dropout(cfg.dropout),
-                nn.ReLU(),
-                nn.Linear(cfg.hidden_size, target_size),
+                nn.Linear(cfg.hidden_size*2, target_size),
+                #nn.Linear(cfg.hidden_size*2, cfg.hidden_size),
+                #nn.LayerNorm(cfg.hidden_size),
+                #nn.Dropout(cfg.dropout),
+                #nn.ReLU(),
+                #nn.Linear(cfg.hidden_size, target_size),
             )        
           
         # 대 카테고리 분류기
@@ -52,12 +53,11 @@ class CateClassifier(nn.Module):
         # 세 카테고리 분류기
         self.d_cls = get_cls(cfg.n_d_cls)
     
-    def forward(self, token_ids, token_mask, position_ids, token_types, img_feat, label=None):
+    def forward(self, token_ids, token_mask, token_types, img_feat, label=None):
         """        
         매개변수
         token_ids: 전처리된 상품명을 인덱스로 변환하여 token_ids를 만들었음
         token_mask: 실제 token_ids의 개수만큼은 1, 나머지는 0으로 채움
-        position_ids: ▁ 문자를 기준으로 토큰의 ID를 0부터 새롭게 부여하였음
         token_types: ▁ 문자를 기준으로 서로 다른 타입의 토큰임을 타입 인덱스로 저장
         img_feat: resnet50으로 인코딩된 이미지 피처
         label: 정답 대/중/소/세 카테고리
@@ -65,8 +65,7 @@ class CateClassifier(nn.Module):
 
         # 전처리된 상품명을 하나의 텍스트벡터(text_vec)로 변환
         # 반환 튜플(시퀀스 아웃풋, 풀드 아웃풋) 중 시퀀스 아웃풋만 참조 
-        text_output = self.text_encoder(token_ids, token_mask, position_ids=position_ids, 
-                                        token_type_ids=token_types)[0]
+        text_output = self.text_encoder(token_ids, token_mask, token_type_ids=token_types)[0]
         
         # 시퀀스 중 첫 타임스탭의 hidden state만 사용. 
         text_vec = text_output[:, 0]

@@ -172,13 +172,13 @@ def inference(dev_loader, model_list):
     
     # dev_loader에서 반복해서 배치 데이터를 받아옵니다.
     # CateDataset의 __getitem__() 함수의 반환 값과 동일한 변수 반환
-    for step, (token_ids, token_mask, position_ids, token_types, img_feat, _) in enumerate(dev_loader):
+    for step, (token_ids, token_mask, token_types, img_feat, _) in enumerate(dev_loader):
         # 데이터 로딩 시간 기록
         data_time.update(time.time() - end)
         
         # 배치 데이터의 위치를 CPU메모리에서 GPU메모리로 이동
-        token_ids, token_mask, position_ids, token_types, img_feat = (
-            token_ids.cuda(), token_mask.cuda(), position_ids.cuda(), token_types.cuda(), img_feat.cuda())
+        token_ids, token_mask, token_types, img_feat = (
+            token_ids.cuda(), token_mask.cuda(), token_types.cuda(), img_feat.cuda())
         
         batch_size = token_ids.size(0)
         
@@ -187,7 +187,7 @@ def inference(dev_loader, model_list):
             pred_list = []
             # model 별 예측치를 pred_list에 추가합니다.
             for model in model_list:
-                _, pred = model(token_ids, token_mask, position_ids, token_types, img_feat)
+                _, pred = model(token_ids, token_mask, token_types, img_feat)
                 pred_list.append(pred)
             
             # 예측치 리스트를 앙상블 하여 하나의 예측치로 만듭니다.
