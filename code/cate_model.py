@@ -36,12 +36,11 @@ class CateClassifier(nn.Module):
         # 분류기(Classifier) 생성기
         def get_cls(target_size=1):
             return nn.Sequential(
-                nn.Linear(cfg.hidden_size*2, target_size),
-                #nn.Linear(cfg.hidden_size*2, cfg.hidden_size),
-                #nn.LayerNorm(cfg.hidden_size),
-                #nn.Dropout(cfg.dropout),
-                #nn.ReLU(),
-                #nn.Linear(cfg.hidden_size, target_size),
+                nn.Linear(cfg.hidden_size*2, cfg.hidden_size),
+                nn.LayerNorm(cfg.hidden_size),
+                nn.Dropout(cfg.dropout),
+                nn.ReLU(),
+                nn.Linear(cfg.hidden_size, target_size),
             )        
           
         # 대 카테고리 분류기

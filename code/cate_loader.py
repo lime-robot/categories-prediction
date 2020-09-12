@@ -98,3 +98,31 @@ class CateDataset(Dataset):
           tokens의 개수를 반환한다. 즉, 상품명 문장의 개수를 반환한다.
         """
         return len(self.tokens)
+
+import os
+from tqdm import tqdm
+import pandas as pd
+from torch.utils.data import DataLoader
+DB_PATH='../input/processed'
+VOCAB_DIR='../input/processed/vocab'
+
+if __name__== '__main__':
+    train_df = pd.read_csv(os.path.join(DB_PATH, 'train.csv'))
+    train_df['img_idx'] = train_df.index 
+    train_df['unique_cateid'] = (train_df['bcateid'].astype('str') + train_df['mcateid'].astype('str') + 
+                                            train_df['scateid'].astype('str') + train_df['dcateid'].astype('str'))
+    img_feat_path = os.path.join(DB_PATH, 'train_img_feat.h5')    
+    vocab = [line.split('\t')[0] for line in open(os.path.join(VOCAB_DIR, 'spm.vocab')).readlines()]
+    token2id = dict([(w, i) for i, w in enumerate(vocab)])
+    
+    train_db = CateDataset(train_df, img_feat_path, token2id)
+    
+    train_loader = DataLoader(
+        train_db, batch_size=1024, shuffle=False,
+        num_workers=16, pin_memory=True)
+    
+    sum_img_feat = 0
+    for token_ids, token_mask, token_types, img_feat, label in tqdm(train_loader):
+        sum_img_feat += img_feat.sum().item()
+        a = 0 
+    print(sum_img_feat)
