@@ -122,7 +122,7 @@ def main():
     train_df = train_df.iloc[train_idx]
     
     # 토큰을 대응되는 인덱스로 치환할 때 사용될 딕셔너리를 로딩합니다.
-    vocab = [line.split('\t')[0] for line in open(os.path.join(VOCAB_DIR, 'spm.vocab')).readlines()]
+    vocab = [line.split('\t')[0] for line in open(os.path.join(VOCAB_DIR, 'spm.vocab'), encoding='utf-8').readlines()]
     token2id = dict([(w, i) for i, w in enumerate(vocab)])
     print('loading ... done')
 
