@@ -9,10 +9,9 @@ import sentencepiece as spm
 from tqdm import tqdm
 
 
-SETTINGS = json.load(open('SETTINGS.json')) # 세팅 정보를 읽어 온다.
-RAW_DATA_DIR = SETTINGS['RAW_DATA_DIR'] # 카카오에서 다운로드 받은 데이터의 디렉터리
-PROCESSED_DATA_DIR = SETTINGS['PROCESSED_DATA_DIR'] # 전처리된 데이터가 저장될 디렉터리
-VOCAB_DIR = SETTINGS['VOCAB_DIR'] # 전처리에 사용될 사전 파일이 저장될 디렉터리
+RAW_DATA_DIR = "../input/raw_data" # 카카오에서 다운로드 받은 데이터의 디렉터리
+PROCESSED_DATA_DIR = '../input/processed' # 전처리된 데이터가 저장될 디렉터리
+VOCAB_DIR =os.path.join(PROCESSED_DATA_DIR, 'vocab') # 전처리에 사용될 사전 파일이 저장될 디렉터리
 
 # 학습에 사용될 파일 리스트
 TRAIN_FILE_LIST = [
