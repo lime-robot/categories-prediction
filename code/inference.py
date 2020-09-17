@@ -93,7 +93,7 @@ def main():
     dev_df['img_idx'] = dev_df.index
     img_h5_path = CFG.h5_path
     
-    vocab = [line.split('\t')[0] for line in open(os.path.join(VOCAB_DIR, 'spm.vocab')).readlines()]
+    vocab = [line.split('\t')[0] for line in open(os.path.join(VOCAB_DIR, 'spm.vocab'), encoding='utf-8').readlines()]
     token2id = dict([(w, i) for i, w in enumerate(vocab)])    
     print('loading ... done')
         
