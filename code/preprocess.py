@@ -138,7 +138,7 @@ def preprocess():
     train_df['product'] = train_df['product'].map(remove_special_characters)
 
     # product 칼럼의 상품명을 product.txt 파일명으로 저장한다.
-    with open(os.path.join(VOCAB_DIR, 'product.txt'), 'w') as f:
+    with open(os.path.join(VOCAB_DIR, 'product.txt'), 'w', encoding='utf-8') as f:
         f.write(train_df['product'].str.cat(sep='\n'))
 
     # product.txt 파일로 sentencepiece 모델을 학습 시킨다. 
