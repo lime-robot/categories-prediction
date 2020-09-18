@@ -75,5 +75,5 @@ raw_data를 전처리하여 학습에 사용이 가능한 형태로 변환합니
 제출 파일은 `categories-prediction/submissoin`에 저장됩니다. 
 
 ```bash
-python inference.py
+~/workspace/categories-prediction/code$ python inference.py
 ```
