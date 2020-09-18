@@ -31,13 +31,13 @@ pip install -r requirements.txt
 
 임의의 작업 디렉터리 아래에 소스코드를 다운로드 받습니다. 
 ```
-~/workspace$ git clone https://github.com/lime-robot/categories-prediction
+~/workspace$ git clone https://github.com/lime-robot/categories-prediction.git
 ```
 
 ### Step 2: 데이터 다운로드
 
 다운로드 받은 코드 하위 `input` 디렉터리에 `raw_data` 디렉터리를 생성하고, [카카오 아레나 - 쇼핑몰 상품 카테고리 분류 대회의 데이터](https://arena.kakao.com/c/1/data)를 다운로드 받습니다. 
-약 90GB정도의 저장 공간이 필요합니다.
+약 90GB 정도의 저장 공간이 필요합니다.
 
 ```
 categories-prediction/
@@ -53,18 +53,19 @@ categories-prediction/
 ### Step 3: 데이터 전처리
 raw_data를 전처리하여 학습에 사용이 가능한 형태로 변환합니다. 컴퓨터 사양에 따라서 약 10~20분 정도의 시간이 소요됩니다.
 대회에서 제공한 데이터셋인 학습셋(Train set), 데브셋(Dev set), 테스트셋(Test set)을 전처리하여 저장합니다.
+약 90GB 정도의 저장 공간이 필요합니다.
 ```
 ~/workspace/categories-prediction/code$ python preprocess.py
 ```
 
 ### Step 4: 학습하기
-전처리된 학습셋(Train sest)으로 모델을 학습 시키고 파일로 저장시킵니다.
+전처리된 학습셋(Train sest)으로 모델을 학습 시키고 파일로 저장시킵니다. GTX1080 8G기준 약 7~8시간이 소요됩니다.
 
 ```bash
 ~/workspace/categories-prediction/code$ python train.py --fold 0
 ```
 
-성능 향상을 위해 5개의 모델을 학습시킬 수 있습니다. 
+성능 향상을 위해 5개의 모델을 학습시킬 수 있습니다. GTX1080 8G 기준 약 36시간이 소요됩니다.
 ```bash
 ~/workspace/categories-prediction/code$ bash train.sh
 ```
