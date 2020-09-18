@@ -70,7 +70,7 @@ raw_data를 전처리하여 학습에 사용이 가능한 형태로 변환합니
 ~/workspace/categories-prediction/code$ bash train.sh
 ```
 
-### Step 4: 추론하기
+### Step 5: 추론하기
 학습된 모델을 불러와서 데브셋(Dev set)의 카테고리를 예측하고 제출을 위한 파일을 생성합니다. 
 제출 파일은 `categories-prediction/submissoin`에 저장됩니다. 
 
