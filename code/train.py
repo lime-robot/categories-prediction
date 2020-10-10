@@ -5,7 +5,7 @@ import math
 import torch
 import random
 import argparse
-import cate_loader
+import cate_dataset
 import cate_model
 import numpy as np
 import pandas as pd
@@ -127,9 +127,9 @@ def main():
     print('loading ... done')
 
     # 학습에 적합한 형태의 샘플을 가져오는 CateDataset의 인스턴스를 만듭니다.
-    train_db = cate_loader.CateDataset(train_df, CFG.h5_path, token2id, 
+    train_db = cate_dataset.CateDataset(train_df, CFG.h5_path, token2id, 
                                        CFG.seq_len, CFG.type_vocab_size)
-    valid_db = cate_loader.CateDataset(valid_df, CFG.h5_path, token2id, 
+    valid_db = cate_dataset.CateDataset(valid_df, CFG.h5_path, token2id, 
                                        CFG.seq_len, CFG.type_vocab_size)
      
     # 여러 개의 워커로 빠르게 배치(미니배치)를 생성하도록 DataLoader로 

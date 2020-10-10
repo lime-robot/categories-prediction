@@ -6,7 +6,7 @@ import math
 import glob
 import json
 import torch
-import cate_loader
+import cate_dataset
 import cate_model
 import time
 import random
@@ -126,7 +126,7 @@ def main():
     print('parameters: ', count_parameters(model_list[0]))    
     
     # 모델의 입력에 적합한 형태의 샘플을 가져오는 CateDataset의 인스턴스를 만듭니다.
-    dev_db = cate_loader.CateDataset(dev_df, img_h5_path, token2id, CFG.seq_len, 
+    dev_db = cate_dataset.CateDataset(dev_df, img_h5_path, token2id, CFG.seq_len, 
                                        CFG.type_vocab_size)
     
     # 여러 개의 워커로 빠르게 배치(미니배치)를 생성하도록 DataLoader로 
