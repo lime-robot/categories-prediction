@@ -1,4 +1,3 @@
-
 import os
 import time
 import math
@@ -166,7 +165,7 @@ def main():
     print('num_train_optimization_steps', num_train_optimization_steps)    
 
     # 파라미터 그룹핑 정보 생성
-    # 웨이트 디케이 미적용 파라미터 그룹과 적용 파라미터로 나눔
+    # 가중치 감쇠(weight decay) 미적용 파라미터 그룹과 적용 파라미터로 나눔
     param_optimizer = list(model.named_parameters())    
     no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
     optimizer_grouped_parameters = [
