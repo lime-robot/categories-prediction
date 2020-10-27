@@ -1,9 +1,7 @@
-
 import torch # 파이토치 패키지 임포트
 import torch.nn as nn # 자주 사용하는 torch.nn패키지를 별칭 nn으로 명명
 # 허깅페이스의 트랜스포머 패키지에서 BertConfig, BertModel 클래스 임포트
 from transformers.modeling_bert import BertConfig, BertModel
-
 
 class CateClassifier(nn.Module):
     """상품정보를 받아서 대/중/소/세 카테고리를 예측하는 모델    
@@ -63,7 +61,7 @@ class CateClassifier(nn.Module):
         """
 
         # 전처리된 상품명을 하나의 텍스트벡터(text_vec)로 변환
-        # 반환 튜플(시퀀스 아웃풋, 풀드 아웃풋) 중 시퀀스 아웃풋만 참조 
+        # 반환 튜플(시퀀스 아웃풋, 풀드(pooled) 아웃풋) 중 시퀀스 아웃풋만 사용
         text_output = self.text_encoder(token_ids, token_mask, token_type_ids=token_types)[0]
         
         # 시퀀스 중 첫 타임스탭의 hidden state만 사용. 
@@ -107,4 +105,3 @@ class CateClassifier(nn.Module):
         
         # 최종 계산된 손실과 예측된 대/중/소/세 각 확률분포를 반환
         return loss, [b_pred, m_pred, s_pred, d_pred]
-
