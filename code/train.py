@@ -329,7 +329,7 @@ def train(train_loader, model, optimizer, epoch, scheduler):
                   'LR: {lr:.6f}  '
                   'sent/s {sent_s:.0f} '
                   .format(
-                   epoch, step+1, len(train_loader), batch_time=batch_time,                   
+                   epoch, step+1, len(train_loader),
                    data_time=data_time, loss=losses,
                    o_acc=o_accuracies, b_acc=b_accuracies, m_acc=m_accuracies,
                    s_acc=s_accuracies, d_acc=d_accuracies,
@@ -414,7 +414,7 @@ def validate(valid_loader, model):
                   'DAcc: {d_acc.val:.3f}({d_acc.avg:.3f}) '
                   'sent/s {sent_s:.0f} '
                   .format(
-                   step+1, len(valid_loader), batch_time=batch_time,                   
+                   step+1, len(valid_loader),
                    data_time=data_time, loss=losses,
                    o_acc=o_accuracies, b_acc=b_accuracies, m_acc=m_accuracies,
                    s_acc=s_accuracies, d_acc=d_accuracies,
