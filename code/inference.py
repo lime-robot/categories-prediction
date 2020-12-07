@@ -79,7 +79,7 @@ def main():
     CFG.res_dir=f'res_dir_{args.k}'
     print(CFG.__dict__)    
     
-    # 랜덤 시드를 설정하여 매 코드를 실행할 때마다 동일한 결과를 얻게 합니다.
+    # 랜덤 시드를 설정하여 매 코드를 실행할 때마다 동일한 결과를 얻게 함
     os.environ['PYTHONHASHSEED'] = str(CFG.seed)
     random.seed(CFG.seed)
     np.random.seed(CFG.seed)
@@ -97,11 +97,11 @@ def main():
     token2id = dict([(w, i) for i, w in enumerate(vocab)])    
     print('loading ... done')
         
-    # 찾아진 모델 파일의 개수만큼 모델을 만들어서 파이썬 리스트에 추가합니다.
+    # 찾아진 모델 파일의 개수만큼 모델을 만들어서 파이썬 리스트에 추가함
     model_list = []
-    # args.model_dir에 있는 확장자 .pt를 가지는 모든 모델 파일의 경로를 읽습니다.
+    # args.model_dir에 있는 확장자 .pt를 가지는 모든 모델 파일의 경로를 읽음
     model_path_list = glob.glob(os.path.join(args.model_dir, '*.pt'))
-    # 모델 경로 개수만큼 모델을 생성하여 파이썬 리스트에 추가합니다. 
+    # 모델 경로 개수만큼 모델을 생성하여 파이썬 리스트에 추가함
     for model_path in model_path_list:
         model = cate_model.CateClassifier(CFG)
         if model_path != "":
@@ -125,20 +125,20 @@ def main():
         return sum(p.numel() for p in model.parameters() if p.requires_grad)
     print('parameters: ', count_parameters(model_list[0]))    
     
-    # 모델의 입력에 적합한 형태의 샘플을 가져오는 CateDataset의 인스턴스를 만듭니다.
+    # 모델의 입력에 적합한 형태의 샘플을 가져오는 CateDataset의 인스턴스를 만듦
     dev_db = cate_dataset.CateDataset(dev_df, img_h5_path, token2id, CFG.seq_len, 
                                        CFG.type_vocab_size)
     
     # 여러 개의 워커로 빠르게 배치(미니배치)를 생성하도록 DataLoader로 
-    # CateDataset 인스턴스를 감싸 줍니다.    
+    # CateDataset 인스턴스를 감싸 줌
     dev_loader = DataLoader(
         dev_db, batch_size=CFG.batch_size, shuffle=False,
         num_workers=CFG.num_workers, pin_memory=True)    
     
-    # dev 데이터셋의 모든 상품명에 대해 예측된 카테고리 인덱스를 반환합니다.
+    # dev 데이터셋의 모든 상품명에 대해 예측된 카테고리 인덱스를 반환
     pred_idx = inference(dev_loader, model_list)
     
-    # dev 데이터셋의 상품ID별 예측된 카테고리를 붙여서 제출 파일을 생성하여 저장합니다. 
+    # dev 데이터셋의 상품ID별 예측된 카테고리를 붙여서 제출 파일을 생성하여 저장
     cate_cols = ['bcateid', 'mcateid', 'scateid', 'dcateid'] 
     dev_df[cate_cols] = pred_idx
     os.makedirs(SUBMISSION_DIR, exist_ok=True)
@@ -151,26 +151,26 @@ def main():
 def inference(dev_loader, model_list):
     """
     dev 데이터셋의 모든 상품명에 대해 여러 모델들의 예측한 결과를 앙상블 하여 정확도가 개선된
-    카테고리 인덱스를 반환합니다.
+    카테고리 인덱스를 반환
     
     매개변수
-    dev_loader: dev 데이터셋에서 배치(미니배치) 불러옵니다.
+    dev_loader: dev 데이터셋에서 배치(미니배치) 불러옴
     model_list: args.model_dir에서 불러온 모델 리스트 
     """
     batch_time = AverageMeter()
     data_time = AverageMeter()    
     sent_count = AverageMeter()
     
-    # 모딜 리스트의 모든 모델을 평가(evaluation) 모드로 동작하게 합니다.
+    # 모딜 리스트의 모든 모델을 평가(evaluation) 모드로 작동하게 함
     for model in model_list:
         model.eval()
 
     start = end = time.time()
     
-    # 배치별 예측한 대/중/소/세 카테고리의 인덱스를 리스트로 가집니다.
+    # 배치별 예측한 대/중/소/세 카테고리의 인덱스를 리스트로 가짐
     pred_idx_list = []
     
-    # dev_loader에서 반복해서 배치 데이터를 받아옵니다.
+    # dev_loader에서 반복해서 배치 데이터를 받음
     # CateDataset의 __getitem__() 함수의 반환 값과 동일한 변수 반환
     for step, (token_ids, token_mask, token_types, img_feat, _) in enumerate(dev_loader):
         # 데이터 로딩 시간 기록
@@ -190,9 +190,9 @@ def inference(dev_loader, model_list):
                 _, pred = model(token_ids, token_mask, token_types, img_feat)
                 pred_list.append(pred)
             
-            # 예측치 리스트를 앙상블 하여 하나의 예측치로 만듭니다.
+            # 예측치 리스트를 앙상블 하여 하나의 예측치로 만듦
             pred = ensemble(pred_list)
-            # 예측치에서 카테고리별 인덱스를 가져옵니다.
+            # 예측치에서 카테고리별 인덱스를 가져옴
             pred_idx = get_pred_idx(pred)
             # 현재 배치(미니배치)에서 얻어진 카테고리별 인덱스를 pred_idx_list에 추가
             pred_idx_list.append(pred_idx.cpu())
@@ -219,24 +219,26 @@ def inference(dev_loader, model_list):
     pred_idx = torch.cat(pred_idx_list).numpy()
     return pred_idx
 
-
+# 예측치의 각 카테고리 별로 가장 큰 값을 가지는 인덱스를 반환함
 def get_pred_idx(pred):
-    b_pred, m_pred, s_pred, d_pred= pred    
-    _, b_idx = b_pred.max(1)
-    _, m_idx = m_pred.max(1)
-    _, s_idx = s_pred.max(1)
-    _, d_idx = d_pred.max(1)
+    b_pred, m_pred, s_pred, d_pred= pred # 대/중/소/세 예측치로 분리
+    _, b_idx = b_pred.max(1) # 대카테고리 중 가장 큰 값을 가지는 인덱스를 변수에 할당
+    _, m_idx = m_pred.max(1) # 중카테고리 중 가장 큰 값을 가지는 인덱스를 변수에 할당
+    _, s_idx = s_pred.max(1) # 소카테고리 중 가장 큰 값을 가지는 인덱스를 변수에 할당
+    _, d_idx = d_pred.max(1) # 세카테고리 중 가장 큰 값을 가지는 인덱스를 변수에 할당
+    
+    # 대/중/소/세 인덱스 반환
     pred_idx = torch.stack([b_idx, m_idx, s_idx, d_idx], 1)    
     return pred_idx
 
 
-# 예측된 대/중/소/세 결과들을 앙상블합니다. 
-# 앙상블 방법으로 간단히 산술 평균을 사용합니다.
+# 예측된 대/중/소/세 결과들을 앙상블함
+# 앙상블 방법으로 간단히 산술 평균을 사용
 def ensemble(pred_list):
     b_pred, m_pred, s_pred, d_pred = 0, 0, 0, 0    
     for pred in pred_list:
-        # softmax를 적용해 대/중/소/세 각 카테고리별 모든 클래스의 합이 1이 되도록 정규화 합니다.
-        # 참고로 정규화된 pred[0]은 대카테고리의 클래스별 확률값을 가지는 확률분포 함수라 볼 수 있습니다.     
+        # softmax를 적용해 대/중/소/세 각 카테고리별 모든 클래스의 합이 1이 되도록 정규화
+        # 참고로 정규화된 pred[0]은 대카테고리의 클래스별 확률값을 가지는 확률분포 함수라 볼 수 있음
         b_pred += torch.softmax(pred[0], 1)
         m_pred += torch.softmax(pred[1], 1)
         s_pred += torch.softmax(pred[2], 1)
