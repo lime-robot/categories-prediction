@@ -1,7 +1,7 @@
 import torch # 파이토치 패키지 임포트
 import torch.nn as nn # 자주 사용하는 torch.nn패키지를 별칭 nn으로 명명
 # 허깅페이스의 트랜스포머 패키지에서 BertConfig, BertModel 클래스 임포트
-from transformers.modeling_bert import BertConfig, BertModel
+from transformers import BertConfig, BertModel
 
 class CateClassifier(nn.Module):
     """상품정보를 받아서 대/중/소/세 카테고리를 예측하는 모델    
