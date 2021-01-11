@@ -1,4 +1,3 @@
-
 import os
 os.environ['OMP_NUM_THREADS'] = '24'
 os.environ['NUMEXPR_MAX_THREADS'] = '24'
@@ -53,6 +52,7 @@ class CFG:
     csv_path = os.path.join(DB_DIR, 'dev.csv') # 전처리 돼 저장된 dev 데이터셋    
     h5_path = os.path.join(DB_DIR, 'dev_img_feat.h5')
 
+    
 
 def main():
     # 명령행에서 받을 키워드 인자를 설정합니다.
