@@ -1,9 +1,9 @@
 # 상품 카테고리 분류기
 
-[카카오 아레나 - 쇼핑몰 상품 카테고리 분류 대회](https://arena.kakao.com/c/1)에 참여해 1등의 성적을 거둔 라임로봇의 오픈소스입니다. 
+[카카오 아레나 데이터 경진대회 1등 노하우](https://wikibook.co.kr/kakao-arena) 서적의 **2장 - 쇼핑몰 상품 카테고리 분류 1등 솔루션**의 소스코드입니다. [카카오 아레나 - 쇼핑몰 상품 카테고리 분류 대회](https://arena.kakao.com/c/1)에 참여해 1등의 성적을 거뒀던 솔루션은 LSTM(Long short-term memory) 기반의 텍스트 인코더였으나 집필 과정에서 최신 기술인 트랜스포머(Transformer)로 수정했습니다. 인코더로 LSTM을 사용한 버전은 다음의 [링크](https://github.com/lime-robot/product-categories-classification)를 확인해 주세요.
+
 본 분류기는 상품명(product 컬럼)과 이미지 특징(img_feat 컬럼)을 입력으로 사용하여 대/중/소/세 카테고리를 예측합니다. 
-상품명을 인코딩 하기 위한 인코더로 최근 뜨거운 관심을 받고 있는 트랜스포머 아키텍처를 사용했습니다. 
-인코더로 LSTM을 사용한 버전은 다음의 [링크](https://github.com/lime-robot/product-categories-classification)를 확인해 주세요.
+
 
 <img src="./doc/model_block.png" width="600">
 
@@ -16,7 +16,8 @@
 
 
 ## Requirements
-Ubuntu 18.04, Python 3.7, pytorch 1.6.0에서 실행을 확인하였습니다.
+Ubuntu 18.04, Python 3.7, pytorch 1.6.0에서 실행됨을 확인하였습니다.
+- (추가) Ubuntu 18.04, Python 3.8, pytorch 1.7.1에서 실행됨을 확인하였습니다.
 
 CPU 코어 4개 / 메모리 16G / GTX1080 8GB / 저장공간 180GB의 최소 사양이 필요합니다. 
 
